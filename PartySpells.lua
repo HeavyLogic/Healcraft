@@ -125,6 +125,8 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     hl:SetBlendMode("ADD")
 
     slot:EnableMouse(true)
+    slot:RegisterForClicks("AnyUp")
+    slot:RegisterForDrag("LeftButton")
 
     slot:SetScript("OnEnter", function(self)
         if self.spellName then
@@ -158,9 +160,17 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
             print("[PartySpells] GetSpellInfo result: name=" .. tostring(name) .. " texture=" .. tostring(texture))
 
             if name and texture then
+                -- swap logic
+                local oldName = self.spellName
+
                 FillSlot(self, name, texture)
                 SaveSlot(self.unitID, self.slotIndex, name)
                 ClearCursor()
+
+                if oldName then
+                    print("[PartySpells] SWAP put old spell back to cursor: " .. oldName)
+                    PickupSpell(oldName)
+                end
             else
                 print("[PartySpells] ERROR: GetSpellInfo returned nil")
             end
@@ -168,18 +178,15 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     end
 
     slot:SetScript("OnReceiveDrag", TryReceiveSpell)
-    -- slot:SetScript("OnMouseUp", function(self, btn)
-    --     if btn == "LeftButton" then
-    --         if self.spellName then
-    --             print("[PartySpells] CAST " .. self.spellName .. " -> " .. self.unitID)
-    --             CastSpellByName(self.spellName, self.unitID)
-    --         else
-    --             TryReceiveSpell(self)
-    --         end
-    --     elseif btn == "RightButton" then
-    --         ClearSlot(self)
-    --     end
-    -- end)
+
+    -- drag start (pick up spell from slot like action bar)
+    slot:SetScript("OnDragStart", function(self)
+        if self.spellName then
+            print("[PartySpells] PICKUP " .. self.spellName)
+            PickupSpell(self.spellName)
+            ClearSlot(self)
+        end
+    end)
 
     return slot
 end
