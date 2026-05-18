@@ -154,9 +154,15 @@ local function ClearSlot(slot)
     print("[PartySpells] ClearSlot unit=" .. slot.unitID .. " slot=" .. slot.slotIndex)
     slot.spellName = nil
     slot.icon:Hide()
-    slot.cd:Hide()
-    slot.outOfRange:Hide() -- Прячем красную пелену
+    if slot.cd then slot.cd:Hide() end
+    if slot.outOfRange then slot.outOfRange:Hide() end
     SaveSlot(slot.unitID, slot.slotIndex, nil)
+
+    -- Очищаем атрибуты (только вне боя, в бою это запрещено ядром игры)
+    if not InCombatLockdown() then
+        slot:SetAttribute("type", nil)
+        slot:SetAttribute("spell", nil)
+    end
 end
 
 -- -----------------------------------------------------------------------
@@ -230,37 +236,90 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
         GameTooltip:Hide()
     end)
 
+    -- -----------------------------------------------------------------------
+    -- Receive Drag / Swap Logic
+    -- -----------------------------------------------------------------------
+    
+    local function HandleReceiveSpell(self, id, subType)
+        local name, _, texture = GetSpellInfo(id, subType)
+        print("[PartySpells] HandleReceiveSpell: name=" .. tostring(name) .. " texture=" .. tostring(texture))
+    
+        if name and texture then
+            -- Запоминаем старый спелл (если он был)
+            local oldName = self.spellName
+    
+            -- Заполняем слот (FillSlot сам обновит атрибуты на type="spell")
+            FillSlot(self, name, texture)
+            SaveSlot(self.unitID, self.slotIndex, name)
+            ClearCursor() -- На всякий случай очищаем курсор
+    
+            -- Если в слоте уже был спелл, берем его на курсор
+            if oldName then
+                print("[PartySpells] SWAP put old spell back to cursor: " .. oldName)
+                PickupSpell(oldName)
+            end
+            return true
+        else
+            print("[PartySpells] ERROR: GetSpellInfo returned nil")
+            return false
+        end
+    end
+    
     local function TryReceiveSpell(self)
         local infoType, id, subType = GetCursorInfo()
-        print("[PartySpells] DRAG infoType=" .. tostring(infoType) .. " id=" .. tostring(id) .. " subType=" .. tostring(subType))
-
         if infoType == "spell" then
-            local name, _, texture = GetSpellInfo(id, subType)
-            print("[PartySpells] GetSpellInfo result: name=" .. tostring(name) .. " texture=" .. tostring(texture))
-
-            if name and texture then
-                -- swap logic
-                local oldName = self.spellName
-
-                FillSlot(self, name, texture)
-                SaveSlot(self.unitID, self.slotIndex, name)
-                ClearCursor()
-
-                if oldName then
-                    print("[PartySpells] SWAP put old spell back to cursor: " .. oldName)
-                    PickupSpell(oldName)
-                end
-            else
-                print("[PartySpells] ERROR: GetSpellInfo returned nil")
-            end
+            return HandleReceiveSpell(self, id, subType)
         end
+        return false
     end
 
     slot:SetScript("OnReceiveDrag", TryReceiveSpell)
 
+    slot:SetScript("OnReceiveDrag", TryReceiveSpell)
+
+    slot:SetScript("PreClick", function(self, button)
+        -- Обрабатываем дроп только левой кнопкой мыши
+        if button ~= "LeftButton" then return end
+        
+        local infoType, id, subType = GetCursorInfo()
+        if infoType == "spell" then
+            self.isDropping = true
+            -- Сохраняем данные заклинания до того, как клиент успеет очистить курсор
+            self.dropID = id
+            self.dropSubType = subType
+            
+            if not InCombatLockdown() then
+                -- Временно удаляем type, чтобы SecureActionButton не скастовал спелл на этом же клике
+                self.oldType = self:GetAttribute("type")
+                self:SetAttribute("type", nil)
+            else
+                print("[PartySpells] Ошибка: Нельзя менять заклинания в бою!")
+            end
+        else
+            self.isDropping = false
+        end
+    end)
+
+    slot:SetScript("PostClick", function(self, button)
+        if button ~= "LeftButton" then return end
+        
+        if self.isDropping then
+            self.isDropping = false
+            if not InCombatLockdown() then
+                -- Вызываем нашу функцию обмена
+                local success = HandleReceiveSpell(self, self.dropID, self.dropSubType)
+                
+                -- Если что-то пошло не так (вернулся false), восстанавливаем старый атрибут
+                if not success and self.oldType then
+                    self:SetAttribute("type", self.oldType)
+                end
+            end
+        end
+    end)
+
     -- drag start (pick up spell from slot like action bar)
     slot:SetScript("OnDragStart", function(self)
-        if self.spellName then
+        if self.spellName and not InCombatLockdown() then
             print("[PartySpells] PICKUP " .. self.spellName)
             PickupSpell(self.spellName)
             ClearSlot(self)
