@@ -76,6 +76,12 @@ local function FillSlot(slot, spellName, texture)
     slot.spellName = spellName
     slot.icon:SetTexture(texture)
     slot.icon:Show()
+
+    -- secure attributes for casting
+    slot:SetAttribute("type", "spell")
+    slot:SetAttribute("spell", spellName)
+    slot:SetAttribute("unit", slot.unitID)
+
     print("[PartySpells] FillSlot OK name=" .. spellName)
 end
 
@@ -91,7 +97,7 @@ end
 -- -----------------------------------------------------------------------
 
 local function CreateSpellSlot(parent, unitID, slotIndex)
-    local slot = CreateFrame("Frame", nil, parent)
+    local slot = CreateFrame("Button", nil, parent, "SecureActionButtonTemplate")
     slot:SetSize(SLOT_SIZE, SLOT_SIZE)
     slot.unitID    = unitID
     slot.slotIndex = slotIndex
@@ -162,13 +168,18 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     end
 
     slot:SetScript("OnReceiveDrag", TryReceiveSpell)
-    slot:SetScript("OnMouseUp", function(self, btn)
-        if btn == "LeftButton" then
-            TryReceiveSpell(self)
-        elseif btn == "RightButton" then
-            ClearSlot(self)
-        end
-    end)
+    -- slot:SetScript("OnMouseUp", function(self, btn)
+    --     if btn == "LeftButton" then
+    --         if self.spellName then
+    --             print("[PartySpells] CAST " .. self.spellName .. " -> " .. self.unitID)
+    --             CastSpellByName(self.spellName, self.unitID)
+    --         else
+    --             TryReceiveSpell(self)
+    --         end
+    --     elseif btn == "RightButton" then
+    --         ClearSlot(self)
+    --     end
+    -- end)
 
     return slot
 end
