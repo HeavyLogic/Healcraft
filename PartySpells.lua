@@ -21,6 +21,68 @@ local FRAMES = {
 local rows = {}
 
 -- -----------------------------------------------------------------------
+-- Cooldowns update
+-- -----------------------------------------------------------------------
+local function UpdateCooldowns()
+    -- Проходим по всем созданным строкам
+    for unitID, row in pairs(rows) do
+        -- Обновляем кулдауны только если фрейм игрока сейчас отображается
+        if row.frame:IsVisible() then
+            for i = 1, SLOTS_COUNT do
+                local slot = row.slots[i]
+                if slot.spellName then
+                    -- GetSpellCooldown понимает имя спелла в 3.3.5
+                    local start, duration, enable = GetSpellCooldown(slot.spellName)
+                    if start and duration then
+                        -- Эта стандартная функция WoW берет на себя всю отрисовку спиральки
+                        CooldownFrame_SetTimer(slot.cd, start, duration, enable)
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- -----------------------------------------------------------------------
+-- Range Check (Оптимизированный таймер)
+-- -----------------------------------------------------------------------
+local RANGE_CHECK_INTERVAL = 0.2 -- Проверяем 5 раз в секунду
+local rangeTimer = 0
+
+local rangeFrame = CreateFrame("Frame")
+rangeFrame:SetScript("OnUpdate", function(self, elapsed)
+    -- Накапливаем время, прошедшее с предыдущего кадра
+    rangeTimer = rangeTimer + elapsed
+    
+    -- Как только набралось 0.2 сек, делаем проверку
+    if rangeTimer >= RANGE_CHECK_INTERVAL then
+        rangeTimer = 0 -- Сбрасываем таймер
+        
+        -- Проходим только по существующим строкам
+        for unitID, row in pairs(rows) do
+            -- Проверяем только если строка видима (член группы существует)
+            if row.frame:IsVisible() then
+                for i = 1, SLOTS_COUNT do
+                    local slot = row.slots[i]
+                    if slot.spellName then
+                        -- IsSpellInRange нативно понимает строковое имя спелла в 3.3.5
+                        local inRange = IsSpellInRange(slot.spellName, slot.unitID)
+                        
+                        -- Если вернулся 0, значит спелл точно не достает до цели
+                        if inRange == 0 then
+                            slot.outOfRange:Show()
+                        else
+                            -- Во всех остальных случаях (в зоне или цель невалидна) - скрываем
+                            slot.outOfRange:Hide()
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- -----------------------------------------------------------------------
 -- SavedVariables: store spell NAME (stable across reloads in 3.3.5)
 -- -----------------------------------------------------------------------
 
@@ -83,12 +145,17 @@ local function FillSlot(slot, spellName, texture)
     slot:SetAttribute("unit", slot.unitID)
 
     print("[PartySpells] FillSlot OK name=" .. spellName)
+    
+    -- Обновляем кулдауны, чтобы только что брошенный спелл показал правильный таймер
+    UpdateCooldowns()
 end
 
 local function ClearSlot(slot)
     print("[PartySpells] ClearSlot unit=" .. slot.unitID .. " slot=" .. slot.slotIndex)
     slot.spellName = nil
     slot.icon:Hide()
+    slot.cd:Hide()
+    slot.outOfRange:Hide() -- Прячем красную пелену
     SaveSlot(slot.unitID, slot.slotIndex, nil)
 end
 
@@ -118,6 +185,18 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     icon:Hide()
     slot.icon = icon
+
+    local cd = CreateFrame("Cooldown", nil, slot, "CooldownFrameTemplate")
+    cd:SetAllPoints(icon) -- Кулдаун будет покрывать только саму иконку
+    cd:SetReverse(false)  -- Обычное затемнение
+    slot.cd = cd
+
+    local outOfRange = slot:CreateTexture(nil, "OVERLAY")
+    outOfRange:SetAllPoints(icon) -- Слой накладывается поверх самой иконки
+    -- Задаем цвет: Красный (R=1, G=0, B=0) с прозрачностью 60% (Alpha=0.6)
+    outOfRange:SetTexture(1, 0, 0, 0.6) 
+    outOfRange:Hide() -- Скрыт по умолчанию
+    slot.outOfRange = outOfRange
 
     local hl = slot:CreateTexture(nil, "HIGHLIGHT")
     hl:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
@@ -267,6 +346,8 @@ end
 local initFrame = CreateFrame("Frame")
 initFrame:RegisterEvent("PLAYER_LOGIN")
 initFrame:RegisterEvent("PARTY_MEMBERS_CHANGED")
+-- Регистрируем эвент обновления кулдаунов заклинаний
+initFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 
 initFrame:SetScript("OnEvent", function(self, event)
     if event == "PLAYER_LOGIN" then
@@ -289,11 +370,15 @@ initFrame:SetScript("OnEvent", function(self, event)
         end
 
         RefreshRows()
+        UpdateCooldowns() -- Разовое обновление при заходе в игру
         print("[PartySpells] loaded, slots per member: " .. SLOTS_COUNT)
-    end
 
-    if event == "PARTY_MEMBERS_CHANGED" then
+    elseif event == "PARTY_MEMBERS_CHANGED" then
         print("[PartySpells] PARTY_MEMBERS_CHANGED")
         RefreshRows()
+
+    elseif event == "SPELL_UPDATE_COOLDOWN" then
+        -- Вызывается клиентом каждый раз, когда начинается/заканчивается ГКД или КД любого спелла
+        UpdateCooldowns()
     end
 end)
