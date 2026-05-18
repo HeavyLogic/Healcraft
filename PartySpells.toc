@@ -5,4 +5,5 @@
 ## Version: 1
 ## SavedVariables: PartySpellsDB
 
+Buffs.lua
 PartySpells.lua

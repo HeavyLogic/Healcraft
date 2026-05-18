@@ -1,4 +1,4 @@
--- PartySpells v0.4
+local addonName, ns = ...
 
 local ADDON_NAME  = "PartySpells"
 local SLOTS_COUNT = 3
@@ -6,6 +6,7 @@ local SLOT_SIZE   = 32
 local SLOT_GAP    = 2
 local OFFSET_X    = 8
 local OFFSET_Y    = 0
+local FLASH_MODE = 2 -- 1 = Плавная заливка (Иммерсивно), 2 = Резкая зеленая рамка (Заметно)
 
 -- party1..4 only — player is NOT included
 -- PartyMemberFrame1 = first party member, etc.
@@ -95,7 +96,7 @@ local function SaveSlot(unitID, slotIndex, spellName)
     local db = GetDB()
     if not db[unitID] then db[unitID] = {} end
     db[unitID][slotIndex] = spellName
-    print("[PartySpells] SAVE unit=" .. unitID .. " slot=" .. slotIndex .. " name=" .. tostring(spellName))
+    -- print("[PartySpells] SAVE unit=" .. unitID .. " slot=" .. slotIndex .. " name=" .. tostring(spellName))
 end
 
 local function LoadSlot(unitID, slotIndex)
@@ -132,7 +133,7 @@ end
 
 local function FillSlot(slot, spellName, texture)
     if not spellName or not texture then
-        print("[PartySpells] FillSlot FAILED name=" .. tostring(spellName) .. " texture=" .. tostring(texture))
+        -- print("[PartySpells] FillSlot FAILED name=" .. tostring(spellName) .. " texture=" .. tostring(texture))
         return
     end
     slot.spellName = spellName
@@ -144,14 +145,15 @@ local function FillSlot(slot, spellName, texture)
     slot:SetAttribute("spell", spellName)
     slot:SetAttribute("unit", slot.unitID)
 
-    print("[PartySpells] FillSlot OK name=" .. spellName)
+    -- print("[PartySpells] FillSlot OK name=" .. spellName)
     
     -- Обновляем кулдауны, чтобы только что брошенный спелл показал правильный таймер
     UpdateCooldowns()
+    ns.UpdateSlotsVisibility()
 end
 
 local function ClearSlot(slot)
-    print("[PartySpells] ClearSlot unit=" .. slot.unitID .. " slot=" .. slot.slotIndex)
+    -- print("[PartySpells] ClearSlot unit=" .. slot.unitID .. " slot=" .. slot.slotIndex)
     slot.spellName = nil
     slot.icon:Hide()
     if slot.cd then slot.cd:Hide() end
@@ -163,8 +165,21 @@ local function ClearSlot(slot)
         slot:SetAttribute("type", nil)
         slot:SetAttribute("spell", nil)
     end
+    ns.UpdateSlotsVisibility()
 end
 
+-- Функция для вызова вспышки из других файлов
+function ns.FlashSpellSlot(unitID, spellName)
+    if rows[unitID] then
+        for i = 1, SLOTS_COUNT do
+            local slot = rows[unitID].slots[i]
+            if slot.spellName == spellName then
+                slot.PlayFlash()
+                break
+            end
+        end
+    end
+end
 -- -----------------------------------------------------------------------
 -- Create one spell slot
 -- -----------------------------------------------------------------------
@@ -204,6 +219,49 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     outOfRange:Hide() -- Скрыт по умолчанию
     slot.outOfRange = outOfRange
 
+    local flash = slot:CreateTexture(nil, "OVERLAY")
+    flash:SetBlendMode("ADD")
+    
+    if FLASH_MODE == 1 then
+        flash:SetAllPoints(icon)
+        flash:SetTexture(0, 1, 0, 0.6)
+    else
+        flash:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+        flash:SetVertexColor(0, 1, 0, 1)
+        -- Привязываем центр рамки к центру СЛОТА, а не иконки
+        flash:SetPoint("CENTER", slot, "CENTER", 0, 0)
+        -- Множитель 1.8 делает текстуру достаточно большой, чтобы покрыть бордер слота
+        flash:SetSize(SLOT_SIZE * 1.8, SLOT_SIZE * 1.8)
+    end
+    flash:Hide()
+
+    local fader = CreateFrame("Frame", nil, slot)
+    fader:Hide()
+    fader.elapsed = 0
+    fader:SetScript("OnUpdate", function(self, elapsed)
+        self.elapsed = self.elapsed + elapsed
+        -- Увеличили время до 600 мс (0.6 сек)
+        if self.elapsed >= 0.6 then
+            flash:Hide()
+            self:Hide()
+        else
+            if FLASH_MODE == 1 then
+                -- Плавное затухание
+                flash:SetAlpha(1 - (self.elapsed / 0.6))
+            else
+                -- Режим 2: Резко (просто держим яркость на 100% все 600мс)
+                flash:SetAlpha(1)
+            end
+        end
+    end)
+
+    slot.PlayFlash = function()
+        flash:SetAlpha(1)
+        flash:Show()
+        fader.elapsed = 0
+        fader:Show()
+    end
+
     local hl = slot:CreateTexture(nil, "HIGHLIGHT")
     hl:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
     hl:SetAllPoints(slot)
@@ -242,7 +300,7 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     
     local function HandleReceiveSpell(self, id, subType)
         local name, _, texture = GetSpellInfo(id, subType)
-        print("[PartySpells] HandleReceiveSpell: name=" .. tostring(name) .. " texture=" .. tostring(texture))
+        -- print("[PartySpells] HandleReceiveSpell: name=" .. tostring(name) .. " texture=" .. tostring(texture))
     
         if name and texture then
             -- Запоминаем старый спелл (если он был)
@@ -255,12 +313,12 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     
             -- Если в слоте уже был спелл, берем его на курсор
             if oldName then
-                print("[PartySpells] SWAP put old spell back to cursor: " .. oldName)
+                -- print("[PartySpells] SWAP put old spell back to cursor: " .. oldName)
                 PickupSpell(oldName)
             end
             return true
         else
-            print("[PartySpells] ERROR: GetSpellInfo returned nil")
+            -- print("[PartySpells] ERROR: GetSpellInfo returned nil")
             return false
         end
     end
@@ -293,7 +351,7 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
                 self.oldType = self:GetAttribute("type")
                 self:SetAttribute("type", nil)
             else
-                print("[PartySpells] Ошибка: Нельзя менять заклинания в бою!")
+                -- print("[PartySpells] Ошибка: Нельзя менять заклинания в бою!")
             end
         else
             self.isDropping = false
@@ -320,7 +378,7 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     -- drag start (pick up spell from slot like action bar)
     slot:SetScript("OnDragStart", function(self)
         if self.spellName and not InCombatLockdown() then
-            print("[PartySpells] PICKUP " .. self.spellName)
+            -- print("[PartySpells] PICKUP " .. self.spellName)
             PickupSpell(self.spellName)
             ClearSlot(self)
         end
@@ -365,34 +423,71 @@ local function LoadRow(unitID)
     for i = 1, SLOTS_COUNT do
         local savedName = LoadSlot(unitID, i)
         if savedName then
-            print("[PartySpells] LOAD unit=" .. unitID .. " slot=" .. i .. " name=" .. savedName)
+            -- print("[PartySpells] LOAD unit=" .. unitID .. " slot=" .. i .. " name=" .. savedName)
             local texture = GetTextureByName(savedName)
             if texture then
                 FillSlot(rows[unitID].slots[i], savedName, texture)
             else
-                print("[PartySpells] LOAD FAILED: texture not found for '" .. savedName .. "'")
+                -- print("[PartySpells] LOAD FAILED: texture not found for '" .. savedName .. "'")
             end
         end
     end
 end
-
 -- -----------------------------------------------------------------------
 -- Show / hide rows based on current party size
 -- -----------------------------------------------------------------------
 
 local function RefreshRows()
     local groupSize = GetNumPartyMembers()  -- excludes player, 0 if solo
-    print("[PartySpells] RefreshRows groupSize=" .. groupSize)
+    -- print("[PartySpells] RefreshRows groupSize=" .. groupSize)
 
     for i = 1, 4 do
         local unitID = "party" .. i
         if rows[unitID] then
             if i <= groupSize then
                 rows[unitID].frame:Show()
-                print("[PartySpells] Show row " .. unitID)
+                -- print("[PartySpells] Show row " .. unitID)
             else
                 rows[unitID].frame:Hide()
-                print("[PartySpells] Hide row " .. unitID)
+                -- print("[PartySpells] Hide row " .. unitID)
+            end
+        end
+    end
+end
+
+-- -----------------------------------------------------------------------
+-- API для других модулей аддона
+-- -----------------------------------------------------------------------
+function ns.GetActiveSpells(unitID)
+    local activeSpells = {}
+    if rows[unitID] then
+        for i = 1, SLOTS_COUNT do
+            local spellName = rows[unitID].slots[i].spellName
+            if spellName then
+                -- Добавляем имя спелла как ключ для быстрого поиска
+                activeSpells[spellName] = true
+            end
+        end
+    end
+    return activeSpells
+end
+
+-- скрывает пустые слоты, если мы не перетаскиваем заклинание
+function ns.UpdateSlotsVisibility()
+    local cursorType = GetCursorInfo()
+    local isDraggingSpell = (cursorType == "spell")
+
+    for unitID, row in pairs(rows) do
+        for i = 1, SLOTS_COUNT do
+            local slot = row.slots[i]
+            if slot.spellName or isDraggingSpell then
+                -- Показываем фон и рамку
+                slot:SetBackdropColor(0, 0, 0, 0.85)
+                slot:SetBackdropBorderColor(0.35, 0.35, 0.35, 1)
+            else
+                -- Делаем слот полностью прозрачным
+                slot:SetBackdropColor(0, 0, 0, 0)
+                slot:SetBackdropBorderColor(0, 0, 0, 0)
             end
         end
     end
@@ -407,16 +502,21 @@ initFrame:RegisterEvent("PLAYER_LOGIN")
 initFrame:RegisterEvent("PARTY_MEMBERS_CHANGED")
 -- Регистрируем эвент обновления кулдаунов заклинаний
 initFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+initFrame:RegisterEvent("UNIT_AURA")
+initFrame:RegisterEvent("CURSOR_UPDATE")
 
-initFrame:SetScript("OnEvent", function(self, event)
+initFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "PLAYER_LOGIN" then
-        print("[PartySpells] PLAYER_LOGIN")
+        -- print("[PartySpells] PLAYER_LOGIN")
 
         for _, unitID in ipairs(UNITS) do
             local anchor = FRAMES[unitID]
             if anchor then
                 CreateRow(unitID, anchor)
                 LoadRow(unitID)
+                
+                ns.CreateBuffRow(unitID)
+                ns.UpdateBuffs(unitID)
             end
         end
 
@@ -429,15 +529,26 @@ initFrame:SetScript("OnEvent", function(self, event)
         end
 
         RefreshRows()
-        UpdateCooldowns() -- Разовое обновление при заходе в игру
-        print("[PartySpells] loaded, slots per member: " .. SLOTS_COUNT)
+        UpdateCooldowns()
+        ns.UpdateSlotsVisibility()
+        -- print("[PartySpells] loaded, slots per member: " .. SLOTS_COUNT)
 
     elseif event == "PARTY_MEMBERS_CHANGED" then
-        print("[PartySpells] PARTY_MEMBERS_CHANGED")
+        -- print("[PartySpells] PARTY_MEMBERS_CHANGED")
         RefreshRows()
+        for _, unitID in ipairs(UNITS) do
+            ns.UpdateBuffs(unitID)
+        end
 
     elseif event == "SPELL_UPDATE_COOLDOWN" then
-        -- Вызывается клиентом каждый раз, когда начинается/заканчивается ГКД или КД любого спелла
         UpdateCooldowns()
+
+    elseif event == "CURSOR_UPDATE" then
+        ns.UpdateSlotsVisibility()
+
+    elseif event == "UNIT_AURA" then
+        -- Вызываем функцию обновления баффов
+        -- Она сама внутри проверит, относится ли этот arg1 к нашей группе
+        ns.UpdateBuffs(arg1)
     end
 end)
