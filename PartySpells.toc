@@ -1,0 +1,8 @@
+## Interface: 30300
+## Title: PartySpells
+## Notes: Spell bars under your party members
+## Author: HeavyLogic
+## Version: 1
+## SavedVariables: PartySpellsDB
+
+PartySpells.lua
