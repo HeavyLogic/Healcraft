@@ -15,7 +15,10 @@ function ns.InitDB()
         slotGap    = 2,
         offsetX    = 8,
         offsetY    = 0,
-        flashMode  = 2
+        flashMode  = 2,
+		-- Новые дефолты для Buffs:
+		buffsActive = true,
+		showTimer   = true,
     }
     for k, v in pairs(defs) do
         if PartySpellsDB.settings[k] == nil then

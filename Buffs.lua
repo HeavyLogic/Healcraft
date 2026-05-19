@@ -2,9 +2,8 @@ local addonName, ns = ...
 
 local MAX_BUFFS = 8
 local BUFF_SIZE = 16
-local BUFF_GAP  = 2
-local BUFF_OFFSET_Y = -1
-
+local BUFF_GAP  = 3
+local BUFF_OFFSET_Y = -2
 local SHOW_TIMER = true
 local URGENT_TIME = 5
 
