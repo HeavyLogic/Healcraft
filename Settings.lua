@@ -93,11 +93,11 @@ local function CreateSlider(panel, name, text, minVal, maxVal, step, dbKey, x, y
         PartySpellsDB.settings[dbKey] = value
         _G[self:GetName().."Text"]:SetText(text .. ": " .. value)
         
-        -- Умное обновление
-        if dbKey == "alphaBuffs" then
-            if ns.RefreshAllBuffs then ns.RefreshAllBuffs() end
+        -- обновление
+        if panel.name == "General" then
+			if ns.RefreshLayout then ns.RefreshLayout() end
         else
-            if ns.RefreshLayout then ns.RefreshLayout() end
+            if ns.RefreshAllBuffs then ns.RefreshAllBuffs() end
         end
     end)
     return slider

@@ -541,6 +541,10 @@ function ns.RefreshLayout()
         if anchor then
             local totalWidth = s.slotsCount * s.slotSize + (s.slotsCount - 1) * s.slotGap
             rowData.frame:SetSize(totalWidth, s.slotSize)
+            -- TODO: не работает обновление смещения
+            print(s.offsetX .. ' ' .. s.offsetY)
+            -- print(rowData.frame:GetNumPoints())
+            -- rowData.frame:ClearAllPoints()
             rowData.frame:SetPoint("LEFT", anchor, "RIGHT", s.offsetX, s.offsetY)
             rowData.frame:SetAlpha(s.alphaButtons / 100)
 
