@@ -542,6 +542,7 @@ function ns.RefreshLayout()
             local totalWidth = s.slotsCount * s.slotSize + (s.slotsCount - 1) * s.slotGap
             rowData.frame:SetSize(totalWidth, s.slotSize)
             rowData.frame:SetPoint("LEFT", anchor, "RIGHT", s.offsetX, s.offsetY)
+            rowData.frame:SetAlpha(s.alphaButtons / 100)
 
             for i = 1, MAX_SUPPORTED_SLOTS do
                 local slot = rowData.slots[i]

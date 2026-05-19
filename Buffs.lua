@@ -130,6 +130,7 @@ end
 function ns.UpdateBuffs(unitID)
     local rowData = buffRows[unitID]
     if not rowData then return end
+    rowData.frame:SetAlpha(PartySpellsDB.settings.alphaBuffs / 100)
     
     if not ns.IsActive() or not PartySpellsDB.settings.buffsActive then
         for i = 1, MAX_BUFFS do
