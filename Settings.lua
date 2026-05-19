@@ -42,8 +42,8 @@ function ns.SetActive(state)
 end
 function ns.ToggleActive() ns.SetActive(not ns.IsActive()) end
 function ns.OpenSettings()
-    InterfaceOptionsFrame_OpenToCategory(_G[addonName .. "MainPanel"])
-    InterfaceOptionsFrame_OpenToCategory(_G[addonName .. "MainPanel"])
+    InterfaceOptionsFrame_OpenToCategory(_G[addonName .. "GeneralPanel"])
+    InterfaceOptionsFrame_OpenToCategory(_G[addonName .. "GeneralPanel"])
 end
 
 -- -----------------------------------------------------------------------
@@ -80,8 +80,8 @@ _G[activeCb:GetName() .. "Text"]:SetText(" Включить аддон (Master S
 activeCb:SetScript("OnClick", function(self) ns.SetActive(self:GetChecked() ~= nil) end)
 
 -- Шаблон создания слайдера
-local function CreateSlider(name, text, minVal, maxVal, step, dbKey, x, y)
-    local slider = CreateFrame("Slider", addonName..name.."Slider", generalPanel, "OptionsSliderTemplate")
+local function CreateSlider(panel, name, text, minVal, maxVal, step, dbKey, x, y)
+    local slider = CreateFrame("Slider", addonName..name.."Slider", panel, "OptionsSliderTemplate")
     slider:SetPoint("TOPLEFT", activeCb, "BOTTOMLEFT", x, y)
     slider:SetMinMaxValues(minVal, maxVal)
     slider:SetValueStep(step)
@@ -104,9 +104,9 @@ local function CreateSlider(name, text, minVal, maxVal, step, dbKey, x, y)
 end
 
 -- === Левая колонка ===
-local slotsSlider    = CreateSlider("Slots", "Кол-во слотов", 1, 5, 1, "slotsCount", 0, -20)
-local sizeSlider     = CreateSlider("Size", "Размер слота", 18, 75, 1, "slotSize", 0, -70)
-local gapSlider      = CreateSlider("Gap", "Отступ между слотами", -4, 30, 1, "slotGap", 0, -120)
+local slotsSlider    = CreateSlider(generalPanel, "Slots", "Кол-во слотов", 1, 5, 1, "slotsCount", 0, -20)
+local sizeSlider     = CreateSlider(generalPanel, "Size", "Размер слота", 18, 75, 1, "slotSize", 0, -70)
+local gapSlider      = CreateSlider(generalPanel, "Gap", "Отступ между слотами", -4, 30, 1, "slotGap", 0, -120)
 
 -- Выпадающий список (Dropdown) переехал в левую колонку под слайдеры
 local flashDD = CreateFrame("Frame", addonName.."FlashDropdown", generalPanel, "UIDropDownMenuTemplate")
@@ -145,10 +145,10 @@ local modeTexts = {
 
 
 -- === Правая колонка ===
-local offsetXSlider   = CreateSlider("OffsetX", "Смещение по X", -12, 30, 1, "offsetX", 200, -20)
-local offsetYSlider   = CreateSlider("OffsetY", "Смещение по Y", -20, 30, 1, "offsetY", 200, -70)
+local offsetXSlider   = CreateSlider(generalPanel, "OffsetX", "Смещение по X", -12, 30, 1, "offsetX", 200, -20)
+local offsetYSlider   = CreateSlider(generalPanel, "OffsetY", "Смещение по Y", -20, 30, 1, "offsetY", 200, -70)
 -- Прозрачность кнопок переехала в правую колонку
-local btnAlphaSlider  = CreateSlider("BtnAlpha", "Прозрачность кнопок (%)", 10, 100, 5, "alphaButtons", 200, -120)
+local btnAlphaSlider  = CreateSlider(generalPanel, "BtnAlpha", "Прозрачность кнопок (%)", 10, 100, 5, "alphaButtons", 200, -120)
 
 
 -- -----------------------------------------------------------------------
@@ -173,12 +173,12 @@ end)
 -- -----------------------------------------------------------------------
 -- Настройки баффов
 -- -----------------------------------------------------------------------
-local buffsTitle = buffsPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-buffsTitle:SetPoint("TOPLEFT", activeCb, "BOTTOMLEFT", 0, -260)
-buffsTitle:SetText("Настройки модуля баффов:")
+local buffsTitle = buffsPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+buffsTitle:SetPoint("TOPLEFT", 16, -16)
+buffsTitle:SetText("PartySpells: Buffs")
 
 local buffsActiveCb = CreateFrame("CheckButton", addonName .. "BuffsActiveCheckbox", buffsPanel, "InterfaceOptionsCheckButtonTemplate")
-buffsActiveCb:SetPoint("TOPLEFT", buffsTitle, "BOTTOMLEFT", 0, -5)
+buffsActiveCb:SetPoint("TOPLEFT", buffsTitle, "BOTTOMLEFT", 0, -16)
 _G[buffsActiveCb:GetName() .. "Text"]:SetText(" Включить отображение баффов")
 buffsActiveCb:SetScript("OnClick", function(self)
     PartySpellsDB.settings.buffsActive = (self:GetChecked() ~= nil)
@@ -194,7 +194,7 @@ showTimerCb:SetScript("OnClick", function(self)
 end)
 
 -- Прозрачность баффов (Создаем с заглушками координат, затем перевешиваем под чекбокс)
-local buffAlphaSlider = CreateSlider("BuffAlpha", "Прозрачность баффов (%)", 10, 100, 5, "alphaBuffs", 0, 0)
+local buffAlphaSlider = CreateSlider(buffsPanel, "BuffAlpha", "Прозрачность баффов (%)", 10, 100, 5, "alphaBuffs", 0, 0)
 buffAlphaSlider:ClearAllPoints()
 buffAlphaSlider:SetPoint("TOPLEFT", showTimerCb, "BOTTOMLEFT", 0, -20)
 

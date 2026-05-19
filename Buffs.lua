@@ -1,14 +1,14 @@
 local addonName, ns = ...
 
-local MAX_BUFFS = 8
-local BUFF_SIZE = 16
+local BUFF_SIZE = 16 -- на 19 появляется встроенный таймер
 local BUFF_GAP  = 3
-local BUFF_OFFSET_Y = -2
+local BUFF_OFFSET_Y = -1
+local PRE_URGENT_TIME = 9
 local URGENT_TIME = 5
 
 -- Настройки шрифта
 local FONT_FILE = "Fonts\\FRIZQT__.TTF" -- Стандартный шрифт интерфейса WoW
-local FONT_NORMAL_SIZE = 9
+local FONT_NORMAL_SIZE = 10
 local FONT_URGENT_SIZE = 12
 
 local buffRows = {}
@@ -34,12 +34,15 @@ local function CreateBuffSlot(parent, unitID)
     textFrame:SetAllPoints()
     textFrame:SetFrameLevel(cd:GetFrameLevel() + 2) -- Делаем уровень выше, чем у cd
 
+    -- Это стаки заклинаний (Lifebloom у друида)
     local countText = textFrame:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
     countText:SetPoint("BOTTOMRIGHT", textFrame, "BOTTOMRIGHT", 2, -2)
     slot.countText = countText
+    -- TODO: не влезает - пофиксить
+    -- slot.countText:SetText("9")
 
     local timerText = textFrame:CreateFontString(nil, "OVERLAY")
-    timerText:SetPoint("CENTER", textFrame, "CENTER", 1, 0)
+    timerText:SetPoint("CENTER", textFrame, "CENTER", 0, 0)
     timerText:SetFont(FONT_FILE, FONT_NORMAL_SIZE, "OUTLINE")
     timerText:SetTextColor(1, 0.82, 0)
     slot.timerText = timerText
@@ -55,7 +58,7 @@ local function CreateBuffSlot(parent, unitID)
                     if not self.isUrgent then
                         self.isUrgent = true
                         -- 1. Сделали затемнение гораздо мягче (0.85 вместо 0.7)
-                        self.icon:SetVertexColor(0.85, 0.85, 0.85) 
+                        -- self.icon:SetVertexColor(0.85, 0.85, 0.85) 
                         if s.showTimer then
                             self.timerText:SetFont(FONT_FILE, FONT_URGENT_SIZE, "OUTLINE")
                             self.timerText:SetTextColor(1, 0, 0)
@@ -64,7 +67,7 @@ local function CreateBuffSlot(parent, unitID)
                 else
                     if self.isUrgent then
                         self.isUrgent = false
-                        self.icon:SetVertexColor(1, 1, 1)
+                        -- self.icon:SetVertexColor(1, 1, 1)
                         if s.showTimer then
                             self.timerText:SetFont(FONT_FILE, FONT_NORMAL_SIZE, "OUTLINE")
                             self.timerText:SetTextColor(1, 0.82, 0)
@@ -81,7 +84,7 @@ local function CreateBuffSlot(parent, unitID)
             else
                 self.expirationTime = 0
                 self.isUrgent = false
-                self.icon:SetVertexColor(1, 1, 1)
+                -- self.icon:SetVertexColor(1, 1, 1)
                 self.timerText:SetText("")
             end
         end
@@ -109,11 +112,11 @@ function ns.CreateBuffRow(unitID)
     if not manaBar then return end
 
     local row = CreateFrame("Frame", addonName .. "BuffRow_" .. unitID, manaBar:GetParent())
-    row:SetSize((BUFF_SIZE + BUFF_GAP) * MAX_BUFFS, BUFF_SIZE)
+    row:SetSize((BUFF_SIZE + BUFF_GAP) * PartySpellsDB.settings.slotsCount, BUFF_SIZE)
     row:SetPoint("TOPLEFT", manaBar, "BOTTOMLEFT", 0, BUFF_OFFSET_Y)
 
     local slots = {}
-    for i = 1, MAX_BUFFS do
+    for i = 1, PartySpellsDB.settings.slotsCount do
         local slot = CreateBuffSlot(row, unitID)
         if i == 1 then
             slot:SetPoint("LEFT", row, "LEFT", 0, 0)
@@ -133,7 +136,7 @@ function ns.UpdateBuffs(unitID)
     rowData.frame:SetAlpha(PartySpellsDB.settings.alphaBuffs / 100)
     
     if not ns.IsActive() or not PartySpellsDB.settings.buffsActive then
-        for i = 1, MAX_BUFFS do
+        for i = 1, PartySpellsDB.settings.slotsCount do
             local slot = rowData.slots[i]
             slot:Hide()
             slot.buffIndex = nil
@@ -178,7 +181,7 @@ function ns.UpdateBuffs(unitID)
                 local remain = expirationTime - GetTime()
                 if remain > URGENT_TIME then
                     slot.isUrgent = false
-                    slot.icon:SetVertexColor(1, 1, 1)
+                    -- slot.icon:SetVertexColor(1, 1, 1)
                     if PartySpellsDB.settings.showTimer then
                         slot.timerText:SetFont(FONT_FILE, FONT_NORMAL_SIZE, "OUTLINE")
                         slot.timerText:SetTextColor(1, 0.82, 0)
@@ -208,13 +211,13 @@ function ns.UpdateBuffs(unitID)
 
     previousBuffs[unitID] = currentBuffs
 
-    for i = displayIndex, MAX_BUFFS do
+    for i = displayIndex, PartySpellsDB.settings.slotsCount do
         local slot = rowData.slots[i]
         slot:Hide()
         slot.buffIndex = nil
         slot.expirationTime = 0
         slot.isUrgent = false
-        slot.icon:SetVertexColor(1, 1, 1)
+        -- slot.icon:SetVertexColor(1, 1, 1)
         slot.timerText:SetText("")
     end
 end
