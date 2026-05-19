@@ -47,27 +47,41 @@ function ns.OpenSettings()
 end
 
 -- -----------------------------------------------------------------------
--- Создание Окна Настроек
+-- Создание Окон Настроек (OmniCC Style)
 -- -----------------------------------------------------------------------
 local mainPanel = CreateFrame("Frame", addonName .. "MainPanel", UIParent)
 mainPanel.name = addonName
 InterfaceOptions_AddCategory(mainPanel)
 
+local generalPanel = CreateFrame("Frame", addonName .. "GeneralPanel", mainPanel)
+generalPanel.name = "General"
+generalPanel.parent = addonName
+InterfaceOptions_AddCategory(generalPanel)
+
+local buffsPanel = CreateFrame("Frame", addonName .. "BuffsPanel", mainPanel)
+buffsPanel.name = "Buffs"
+buffsPanel.parent = addonName
+InterfaceOptions_AddCategory(buffsPanel)
+
+mainPanel:SetScript("OnShow", function()
+    ns.OpenSettings()
+end)
+
 -- -----------------------------------------------------------------------
 -- Наполнение вкладки General
 -- -----------------------------------------------------------------------
-local title = mainPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+local title = generalPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 title:SetPoint("TOPLEFT", 16, -16)
 title:SetText("PartySpells: General")
 
-local activeCb = CreateFrame("CheckButton", addonName .. "ActiveCheckbox", mainPanel, "InterfaceOptionsCheckButtonTemplate")
+local activeCb = CreateFrame("CheckButton", addonName .. "ActiveCheckbox", generalPanel, "InterfaceOptionsCheckButtonTemplate")
 activeCb:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -16)
 _G[activeCb:GetName() .. "Text"]:SetText(" Включить аддон (Master Switch)")
 activeCb:SetScript("OnClick", function(self) ns.SetActive(self:GetChecked() ~= nil) end)
 
 -- Шаблон создания слайдера
 local function CreateSlider(name, text, minVal, maxVal, step, dbKey, x, y)
-    local slider = CreateFrame("Slider", addonName..name.."Slider", mainPanel, "OptionsSliderTemplate")
+    local slider = CreateFrame("Slider", addonName..name.."Slider", generalPanel, "OptionsSliderTemplate")
     slider:SetPoint("TOPLEFT", activeCb, "BOTTOMLEFT", x, y)
     slider:SetMinMaxValues(minVal, maxVal)
     slider:SetValueStep(step)
@@ -95,7 +109,7 @@ local sizeSlider     = CreateSlider("Size", "Размер слота", 18, 75, 1
 local gapSlider      = CreateSlider("Gap", "Отступ между слотами", -4, 30, 1, "slotGap", 0, -120)
 
 -- Выпадающий список (Dropdown) переехал в левую колонку под слайдеры
-local flashDD = CreateFrame("Frame", addonName.."FlashDropdown", mainPanel, "UIDropDownMenuTemplate")
+local flashDD = CreateFrame("Frame", addonName.."FlashDropdown", generalPanel, "UIDropDownMenuTemplate")
 -- UIDropDownMenu имеет скрытый пустой отступ слева, поэтому смещаем на X = -15, чтобы выровнять с ползунками
 flashDD:SetPoint("TOPLEFT", activeCb, "BOTTOMLEFT", -15, -170) 
 local flashLabel = flashDD:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -140,7 +154,7 @@ local btnAlphaSlider  = CreateSlider("BtnAlpha", "Прозрачность кн�
 -- -----------------------------------------------------------------------
 -- Различные переключатели
 -- -----------------------------------------------------------------------
-local lockSpellsCb = CreateFrame("CheckButton", addonName .. "LockSpellsCheckbox", mainPanel, "InterfaceOptionsCheckButtonTemplate")
+local lockSpellsCb = CreateFrame("CheckButton", addonName .. "LockSpellsCheckbox", generalPanel, "InterfaceOptionsCheckButtonTemplate")
 lockSpellsCb:SetPoint("TOPLEFT", activeCb, "BOTTOMLEFT", 0, -220)
 _G[lockSpellsCb:GetName() .. "Text"]:SetText(" Закрепить заклинания (Мгновенный каст, без Drag&Drop)")
 lockSpellsCb:SetScript("OnClick", function(self)
@@ -159,11 +173,11 @@ end)
 -- -----------------------------------------------------------------------
 -- Настройки баффов
 -- -----------------------------------------------------------------------
-local buffsTitle = mainPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+local buffsTitle = buffsPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 buffsTitle:SetPoint("TOPLEFT", activeCb, "BOTTOMLEFT", 0, -260)
 buffsTitle:SetText("Настройки модуля баффов:")
 
-local buffsActiveCb = CreateFrame("CheckButton", addonName .. "BuffsActiveCheckbox", mainPanel, "InterfaceOptionsCheckButtonTemplate")
+local buffsActiveCb = CreateFrame("CheckButton", addonName .. "BuffsActiveCheckbox", buffsPanel, "InterfaceOptionsCheckButtonTemplate")
 buffsActiveCb:SetPoint("TOPLEFT", buffsTitle, "BOTTOMLEFT", 0, -5)
 _G[buffsActiveCb:GetName() .. "Text"]:SetText(" Включить отображение баффов")
 buffsActiveCb:SetScript("OnClick", function(self)
@@ -171,7 +185,7 @@ buffsActiveCb:SetScript("OnClick", function(self)
     if ns.RefreshAllBuffs then ns.RefreshAllBuffs() end
 end)
 
-local showTimerCb = CreateFrame("CheckButton", addonName .. "ShowTimerCheckbox", mainPanel, "InterfaceOptionsCheckButtonTemplate")
+local showTimerCb = CreateFrame("CheckButton", addonName .. "ShowTimerCheckbox", buffsPanel, "InterfaceOptionsCheckButtonTemplate")
 showTimerCb:SetPoint("TOPLEFT", buffsActiveCb, "BOTTOMLEFT", 0, -5)
 _G[showTimerCb:GetName() .. "Text"]:SetText(" Показывать таймер на иконке")
 showTimerCb:SetScript("OnClick", function(self)
