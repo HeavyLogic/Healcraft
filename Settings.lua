@@ -16,6 +16,7 @@ function ns.InitDB()
         offsetX    = 8,
         offsetY    = 0,
         flashMode  = 2,
+		lockSpells = false,
 		-- Новые дефолты для Buffs:
 		buffsActive = true,
 		showTimer   = true,
@@ -61,7 +62,7 @@ title:SetText("PartySpells: General")
 local activeCb = CreateFrame("CheckButton", addonName .. "ActiveCheckbox", mainPanel, "InterfaceOptionsCheckButtonTemplate")
 activeCb:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -16)
 _G[activeCb:GetName() .. "Text"]:SetText(" Включить аддон (Master Switch)")
-activeCb:SetScript("OnClick", function(self) ns.SetActive(self:GetChecked()) end)
+activeCb:SetScript("OnClick", function(self) ns.SetActive(self:GetChecked() ~= nil) end)
 
 -- Шаблон создания слайдера
 local function CreateSlider(name, text, minVal, maxVal, step, dbKey, x, y)
@@ -84,17 +85,15 @@ end
 -- Левая колонка
 local slotsSlider = CreateSlider("Slots", "Кол-во слотов", 1, 5, 1, "slotsCount", 0, -20)
 local sizeSlider  = CreateSlider("Size", "Размер слота", 18, 50, 1, "slotSize", 0, -70)
--- Слайдер Gap теперь поддерживает от -2 (слоты будут наслаиваться друг на друга)
 local gapSlider   = CreateSlider("Gap", "Отступ между слотами", -2, 10, 1, "slotGap", 0, -120)
 
 -- Правая колонка
--- Слайдеры для смещения (от -20 до 30)
 local offsetXSlider = CreateSlider("OffsetX", "Смещение по X", -20, 30, 1, "offsetX", 200, -20)
 local offsetYSlider = CreateSlider("OffsetY", "Смещение по Y", -20, 30, 1, "offsetY", 200, -70)
 
 -- Выпадающий список (Dropdown)
 local flashDD = CreateFrame("Frame", addonName.."FlashDropdown", mainPanel, "UIDropDownMenuTemplate")
-flashDD:SetPoint("TOPLEFT", activeCb, "BOTTOMLEFT", 180, -120) -- Сдвинут под правые слайдеры
+flashDD:SetPoint("TOPLEFT", activeCb, "BOTTOMLEFT", 180, -120) 
 local flashLabel = flashDD:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 flashLabel:SetPoint("BOTTOMLEFT", flashDD, "TOPLEFT", 16, 3)
 flashLabel:SetText("Режим вспышки баффа:")
@@ -111,7 +110,6 @@ local function InitFlashDropdown(self, level, menuList)
         info.text = opt.text
         info.arg1 = opt.value
         
-        -- Безопасная проверка: если база еще не загружена (экран загрузки), берем дефолт (2)
         local currentMode = (PartySpellsDB and PartySpellsDB.settings and PartySpellsDB.settings.flashMode) or 2
         info.checked = (currentMode == opt.value)
         
@@ -131,6 +129,54 @@ local modeTexts = {
     [2] = "2: Резкая рамка",
     [3] = "3: Отблеск (Bling)"
 }
+
+-- Чекбокс: Закрепить заклинания
+local lockSpellsCb = CreateFrame("CheckButton", addonName .. "LockSpellsCheckbox", mainPanel, "InterfaceOptionsCheckButtonTemplate")
+-- Ставим его под левыми слайдерами (Y = -160)
+lockSpellsCb:SetPoint("TOPLEFT", activeCb, "BOTTOMLEFT", 0, -160)
+_G[lockSpellsCb:GetName() .. "Text"]:SetText(" Закрепить заклинания (Мгновенный каст, без Drag&Drop)")
+
+lockSpellsCb:SetScript("OnClick", function(self)
+    if InCombatLockdown() then
+        -- Если игрок в бою, отменяем клик и ругаемся
+        print("|cffff0000[PartySpells]|r Нельзя менять эту настройку прямо во время боя!")
+        self:SetChecked(PartySpellsDB.settings.lockSpells)
+        return
+    end
+
+    PartySpellsDB.settings.lockSpells = (self:GetChecked() ~= nil)
+    
+    if ns.UpdateCastingBehavior then 
+        ns.UpdateCastingBehavior() 
+    end
+end)
+-- -----------------------------------------------------------------------
+-- Настройки баффов (Новые чекбоксы)
+-- -----------------------------------------------------------------------
+-- Заголовок для визуального разделения
+local buffsTitle = mainPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+buffsTitle:SetPoint("TOPLEFT", activeCb, "BOTTOMLEFT", 0, -210) -- Размещаем под слайдерами
+buffsTitle:SetText("Настройки модуля баффов:")
+
+-- Чекбокс: Включить баффы
+local buffsActiveCb = CreateFrame("CheckButton", addonName .. "BuffsActiveCheckbox", mainPanel, "InterfaceOptionsCheckButtonTemplate")
+buffsActiveCb:SetPoint("TOPLEFT", buffsTitle, "BOTTOMLEFT", 0, -5)
+_G[buffsActiveCb:GetName() .. "Text"]:SetText(" Включить отображение баффов")
+buffsActiveCb:SetScript("OnClick", function(self)
+    PartySpellsDB.settings.buffsActive = (self:GetChecked() ~= nil)
+    
+    -- ПРИНУДИТЕЛЬНО обновляем все баффы прямо сейчас
+    if ns.RefreshAllBuffs then ns.RefreshAllBuffs() end
+end)
+
+-- Чекбокс: Показывать таймер
+local showTimerCb = CreateFrame("CheckButton", addonName .. "ShowTimerCheckbox", mainPanel, "InterfaceOptionsCheckButtonTemplate")
+showTimerCb:SetPoint("TOPLEFT", buffsActiveCb, "BOTTOMLEFT", 0, -5)
+_G[showTimerCb:GetName() .. "Text"]:SetText(" Показывать таймер на иконке")
+showTimerCb:SetScript("OnClick", function(self)
+    PartySpellsDB.settings.showTimer = (self:GetChecked() ~= nil)
+    if ns.RefreshAllBuffs then ns.RefreshAllBuffs() end
+end)
 
 -- -----------------------------------------------------------------------
 -- Синхронизация UI с базой при загрузке
@@ -153,4 +199,9 @@ initFrame:SetScript("OnEvent", function()
     
 	UIDropDownMenu_SetSelectedValue(flashDD, s.flashMode)
     UIDropDownMenu_SetText(flashDD, modeTexts[s.flashMode] or "1: Плавная заливка")
+    
+    -- Синхронизируем новые чекбоксы
+	lockSpellsCb:SetChecked(s.lockSpells)
+    buffsActiveCb:SetChecked(s.buffsActive)
+    showTimerCb:SetChecked(s.showTimer)
 end)

@@ -4,7 +4,6 @@ local MAX_BUFFS = 8
 local BUFF_SIZE = 16
 local BUFF_GAP  = 3
 local BUFF_OFFSET_Y = -2
-local SHOW_TIMER = true
 local URGENT_TIME = 5
 
 -- Настройки шрифта
@@ -51,12 +50,13 @@ local function CreateBuffSlot(parent, unitID)
         if self.expirationTime and self.expirationTime > 0 then
             local remain = self.expirationTime - GetTime()
             if remain > 0 then
+                local s = PartySpellsDB.settings
                 if remain <= URGENT_TIME then
                     if not self.isUrgent then
                         self.isUrgent = true
                         -- 1. Сделали затемнение гораздо мягче (0.85 вместо 0.7)
                         self.icon:SetVertexColor(0.85, 0.85, 0.85) 
-                        if SHOW_TIMER then
+                        if s.showTimer then
                             self.timerText:SetFont(FONT_FILE, FONT_URGENT_SIZE, "OUTLINE")
                             self.timerText:SetTextColor(1, 0, 0)
                         end
@@ -65,7 +65,7 @@ local function CreateBuffSlot(parent, unitID)
                     if self.isUrgent then
                         self.isUrgent = false
                         self.icon:SetVertexColor(1, 1, 1)
-                        if SHOW_TIMER then
+                        if s.showTimer then
                             self.timerText:SetFont(FONT_FILE, FONT_NORMAL_SIZE, "OUTLINE")
                             self.timerText:SetTextColor(1, 0.82, 0)
                         end
@@ -73,7 +73,7 @@ local function CreateBuffSlot(parent, unitID)
                 end
 
                 -- 2. Рисуем текст ТОЛЬКО если осталось <= 20 секунд
-                if SHOW_TIMER and remain <= 20 then
+                if s.showTimer and remain <= 20 then
                     self.timerText:SetText(math.ceil(remain))
                 else
                     self.timerText:SetText("")
@@ -131,7 +131,7 @@ function ns.UpdateBuffs(unitID)
     local rowData = buffRows[unitID]
     if not rowData then return end
     
-    if not ns.IsActive() then
+    if not ns.IsActive() or not PartySpellsDB.settings.buffsActive then
         for i = 1, MAX_BUFFS do
             local slot = rowData.slots[i]
             slot:Hide()
@@ -178,7 +178,7 @@ function ns.UpdateBuffs(unitID)
                 if remain > URGENT_TIME then
                     slot.isUrgent = false
                     slot.icon:SetVertexColor(1, 1, 1)
-                    if SHOW_TIMER then
+                    if PartySpellsDB.settings.showTimer then
                         slot.timerText:SetFont(FONT_FILE, FONT_NORMAL_SIZE, "OUTLINE")
                         slot.timerText:SetTextColor(1, 0.82, 0)
                     end
@@ -215,5 +215,11 @@ function ns.UpdateBuffs(unitID)
         slot.isUrgent = false
         slot.icon:SetVertexColor(1, 1, 1)
         slot.timerText:SetText("")
+    end
+end
+
+function ns.RefreshAllBuffs()
+    for unitID in pairs(buffRows) do
+        ns.UpdateBuffs(unitID)
     end
 end

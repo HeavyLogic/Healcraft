@@ -14,6 +14,29 @@ local FRAMES = {
 }
 
 local rows = {}
+local MAX_SUPPORTED_SLOTS = 5
+
+-- Функция, которая переключает режим работы кнопок
+function ns.UpdateCastingBehavior()
+    -- Проверяем: загружена ли база. Если нет - по умолчанию false (разрешено таскать)
+    local isLocked = false
+    if PartySpellsDB and PartySpellsDB.settings and type(PartySpellsDB.settings.lockSpells) == "boolean" then
+        isLocked = PartySpellsDB.settings.lockSpells
+    end
+
+    local clickMode = isLocked and "AnyDown" or "AnyUp"
+    
+    for unitID, row in pairs(rows) do
+        if row.slots then
+            for i = 1, MAX_SUPPORTED_SLOTS do
+                local slot = row.slots[i]
+                if slot then
+                    slot:RegisterForClicks(clickMode)
+                end
+            end
+        end
+    end
+end
 
 -- -----------------------------------------------------------------------
 -- Cooldowns update
@@ -278,7 +301,6 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     slot.hl = hl -- Сохраняем, чтобы обращаться к ней позже!
 
     slot:EnableMouse(true)
-    slot:RegisterForClicks("AnyUp")
     slot:RegisterForDrag("LeftButton")
 
     slot:SetScript("OnEnter", function(self)
@@ -387,7 +409,7 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
 
     -- drag start (pick up spell from slot like action bar)
     slot:SetScript("OnDragStart", function(self)
-        if self.spellName and not InCombatLockdown() then
+        if self.spellName and not InCombatLockdown() and not PartySpellsDB.settings.lockSpells then
             -- print("[PartySpells] PICKUP " .. self.spellName)
             PickupSpell(self.spellName)
             ClearSlot(self)
@@ -400,8 +422,6 @@ end
 -- -----------------------------------------------------------------------
 -- Create row for one party member
 -- -----------------------------------------------------------------------
-
-local MAX_SUPPORTED_SLOTS = 5
 
 local function CreateRow(unitID, anchor)
     if rows[unitID] then return end
@@ -564,7 +584,6 @@ end
 local initFrame = CreateFrame("Frame")
 initFrame:RegisterEvent("PLAYER_LOGIN")
 initFrame:RegisterEvent("PARTY_MEMBERS_CHANGED")
--- Регистрируем эвент обновления кулдаунов заклинаний
 initFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 initFrame:RegisterEvent("UNIT_AURA")
 initFrame:RegisterEvent("CURSOR_UPDATE")
@@ -586,15 +605,13 @@ initFrame:SetScript("OnEvent", function(self, event, arg1)
             end
         end
 
-        -- 3. Применяем настройки размера/смещения
         ns.RefreshLayout()
-
-        -- 4. Обновляем видимость (в зависимости от Master Switch)
         ns.RefreshAllVisibility()
-
+        
+        -- Устанавливаем правильный режим кнопок при загрузке
+        ns.UpdateCastingBehavior()
 
     elseif event == "PARTY_MEMBERS_CHANGED" then
-        -- print("[PartySpells] PARTY_MEMBERS_CHANGED")
         RefreshRows()
         for _, unitID in ipairs(UNITS) do
             ns.UpdateBuffs(unitID)
