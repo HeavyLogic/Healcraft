@@ -10,14 +10,13 @@ function ns.InitDB()
 
     -- Настройки по умолчанию
     local defs = {
-        slotsCount = 3,
+        slotsCount = 5,
         slotSize   = 32,
         slotGap    = 2,
-        offsetX    = 8,
-        offsetY    = 0,
-        flashMode  = 2,
+        offsetX    = -7,
+        offsetY    = 6,
+        flashMode  = 3,
 		lockSpells = false,
-		-- Новые дефолты для Buffs:
 		buffsActive = true,
 		showTimer   = true,
     }

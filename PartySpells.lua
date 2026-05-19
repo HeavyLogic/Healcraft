@@ -114,7 +114,6 @@ local function SaveSlot(unitID, slotIndex, spellName)
     local db = GetDB()
     if not db[unitID] then db[unitID] = {} end
     db[unitID][slotIndex] = spellName
-    -- print("[PartySpells] SAVE unit=" .. unitID .. " slot=" .. slotIndex .. " name=" .. tostring(spellName))
 end
 
 local function LoadSlot(unitID, slotIndex)
@@ -151,7 +150,6 @@ end
 
 local function FillSlot(slot, spellName, texture)
     if not spellName or not texture then
-        -- print("[PartySpells] FillSlot FAILED name=" .. tostring(spellName) .. " texture=" .. tostring(texture))
         return
     end
     slot.spellName = spellName
@@ -162,8 +160,6 @@ local function FillSlot(slot, spellName, texture)
     slot:SetAttribute("type", "spell")
     slot:SetAttribute("spell", spellName)
     slot:SetAttribute("unit", slot.unitID)
-
-    -- print("[PartySpells] FillSlot OK name=" .. spellName)
     
     -- Обновляем кулдауны, чтобы только что брошенный спелл показал правильный таймер
     UpdateCooldowns()
@@ -171,7 +167,6 @@ local function FillSlot(slot, spellName, texture)
 end
 
 local function ClearSlot(slot)
-    -- print("[PartySpells] ClearSlot unit=" .. slot.unitID .. " slot=" .. slot.slotIndex)
     slot.spellName = nil
     slot.icon:Hide()
     if slot.cd then slot.cd:Hide() end
@@ -332,7 +327,6 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     
     local function HandleReceiveSpell(self, id, subType)
         local name, _, texture = GetSpellInfo(id, subType)
-        -- print("[PartySpells] HandleReceiveSpell: name=" .. tostring(name) .. " texture=" .. tostring(texture))
     
         if name and texture then
             -- Запоминаем старый спелл (если он был)
@@ -345,12 +339,10 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     
             -- Если в слоте уже был спелл, берем его на курсор
             if oldName then
-                -- print("[PartySpells] SWAP put old spell back to cursor: " .. oldName)
                 PickupSpell(oldName)
             end
             return true
         else
-            -- print("[PartySpells] ERROR: GetSpellInfo returned nil")
             return false
         end
     end
@@ -382,8 +374,6 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
                 -- Временно удаляем type, чтобы SecureActionButton не скастовал спелл на этом же клике
                 self.oldType = self:GetAttribute("type")
                 self:SetAttribute("type", nil)
-            else
-                -- print("[PartySpells] Ошибка: Нельзя менять заклинания в бою!")
             end
         else
             self.isDropping = false
@@ -410,7 +400,6 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     -- drag start (pick up spell from slot like action bar)
     slot:SetScript("OnDragStart", function(self)
         if self.spellName and not InCombatLockdown() and not PartySpellsDB.settings.lockSpells then
-            -- print("[PartySpells] PICKUP " .. self.spellName)
             PickupSpell(self.spellName)
             ClearSlot(self)
         end
@@ -448,12 +437,9 @@ local function LoadRow(unitID)
     for i = 1, s.slotsCount do
         local savedName = LoadSlot(unitID, i)
         if savedName then
-            print("[PartySpells] LOAD unit=" .. unitID .. " slot=" .. i .. " name=" .. savedName)
             local texture = GetTextureByName(savedName)
             if texture then
                 FillSlot(rows[unitID].slots[i], savedName, texture)
-            else
-                print("[PartySpells] LOAD FAILED: texture not found for '" .. savedName .. "'")
             end
         end
     end
@@ -590,8 +576,6 @@ initFrame:RegisterEvent("CURSOR_UPDATE")
 
 initFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "PLAYER_LOGIN" then
-        print("[PartySpells] PLAYER_LOGIN")
-
         -- 1. Сначала загружаем базу и настройки
         ns.InitDB()
 
@@ -610,6 +594,14 @@ initFrame:SetScript("OnEvent", function(self, event, arg1)
         
         -- Устанавливаем правильный режим кнопок при загрузке
         ns.UpdateCastingBehavior()
+
+        if SpellBookFrame then
+            SpellBookFrame:SetMovable(true)
+            SpellBookFrame:EnableMouse(true)
+            SpellBookFrame:RegisterForDrag("LeftButton")
+            SpellBookFrame:SetScript("OnDragStart", function(f) f:StartMoving() end)
+            SpellBookFrame:SetScript("OnDragStop",  function(f) f:StopMovingOrSizing() end)
+        end
 
     elseif event == "PARTY_MEMBERS_CHANGED" then
         RefreshRows()

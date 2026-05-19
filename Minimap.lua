@@ -89,8 +89,8 @@ local function ShowTooltip(self)
     GameTooltip:AddLine("Статус: " .. statusText)
     
     local lockText = (PartySpellsDB and PartySpellsDB.settings and PartySpellsDB.settings.lockSpells) 
-                     and "|cff00ff00Да (Фиолетовая)|r" 
-                     or "|cff808080Нет (Зеленая)|r"
+                     and "|cff00ff00Да|r" 
+                     or "|cff808080Нет|r"
     GameTooltip:AddLine("Закреплено: " .. lockText)
     
     GameTooltip:AddLine(" ")
