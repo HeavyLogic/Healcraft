@@ -3,28 +3,66 @@ local addonName, ns = ...
 -- Создаем кнопку для мини-карты
 local minimapButton = CreateFrame("Button", addonName .. "MinimapButton", Minimap)
 minimapButton:SetSize(32, 32)
-minimapButton:SetFrameLevel(8)
+
+minimapButton:SetFrameStrata("MEDIUM")
+minimapButton:SetFrameLevel(1)
 minimapButton:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
 
--- Сама иконка (текстура будет задаваться динамически в функции UpdateMinimapIcon)
+-- ХИТРОСТЬ ДЛЯ SexyMap: 
+-- 1. Говорим ему, что мы "сами" управляем движением (он не тронет наши скрипты)
+-- 2. При этом он видит кнопку и управляет её видимостью/затуханием
+minimapButton.sexyMapMovable = true 
+
+-- Сама иконка
 local icon = minimapButton:CreateTexture(nil, "BACKGROUND")
 icon:SetSize(20, 20)
 icon:SetPoint("CENTER", minimapButton, "CENTER", 0, 0)
 icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
--- Стандартная близардовская рамка для мини-карты
+-- Стандартная близардовская рамка
 local border = minimapButton:CreateTexture(nil, "OVERLAY")
 border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
 border:SetSize(54, 54)
 border:SetPoint("TOPLEFT", minimapButton, "TOPLEFT", 0, 0)
 
 -- -----------------------------------------------------------------------
--- Логика перетаскивания (Движение по кругу)
+-- Логика перетаскивания (С учетом формы карты для SexyMap)
 -- -----------------------------------------------------------------------
 local function UpdatePosition(angle)
-    local radius = 80
-    local x = math.cos(angle) * radius
-    local y = math.sin(angle) * radius
+    local cos = math.cos(angle)
+    local sin = math.sin(angle)
+    
+    -- --- НАСТРОЙКИ ОРБИТЫ ---
+    local radius = 72 -- Попробуй 76, 77 или 78. Чем меньше число, тем ближе к центру.
+    local squareExp = 106 -- Коэффициент выталкивания в углы для квадрата (в Dominos 110)
+    -- ------------------------
+
+    local shape = GetMinimapShape and GetMinimapShape() or "ROUND"
+    local isRound = true
+    if shape == "SQUARE" then isRound = false
+    elseif shape == "CORNER-TOPRIGHT" then isRound = not(cos < 0 or sin < 0)
+    elseif shape == "CORNER-TOPLEFT" then isRound = not(cos > 0 or sin < 0)
+    elseif shape == "CORNER-BOTTOMRIGHT" then isRound = not(cos < 0 or sin > 0)
+    elseif shape == "CORNER-BOTTOMLEFT" then isRound = not(cos > 0 or sin > 0)
+    elseif shape == "SIDE-LEFT" then isRound = cos <= 0
+    elseif shape == "SIDE-RIGHT" then isRound = cos >= 0
+    elseif shape == "SIDE-TOP" then isRound = sin <= 0
+    elseif shape == "SIDE-BOTTOM" then isRound = sin >= 0
+    end
+
+    local x, y
+    if isRound then
+        -- Обычный круг
+        x = cos * radius
+        y = sin * radius
+    else
+        -- Квадратная математика Dominos, но с твоим радиусом
+        -- Мы ограничиваем (clamp) иконку, чтобы она не улетала за края текстуры
+        x = math.max(-(radius + 2), math.min(squareExp * cos, radius + 4))
+        y = math.max(-(radius + 6), math.min(squareExp * sin, radius + 2))
+    end
+
+    minimapButton:ClearAllPoints()
     minimapButton:SetPoint("CENTER", Minimap, "CENTER", x, y)
 end
 
@@ -57,16 +95,12 @@ end)
 function ns.UpdateMinimapIcon()
     if not PartySpellsDB or not PartySpellsDB.settings then return end
 
-    -- Меняем саму текстуру в зависимости от закрепления
     if PartySpellsDB.settings.lockSpells then
-        -- Фиолетовая (Омоложение)
         icon:SetTexture("Interface\\Icons\\Spell_Nature_Rejuvenation") 
     else
-        -- Зеленая (Восстановление)
         icon:SetTexture("Interface\\Icons\\Spell_Nature_ResistNature") 
     end
 
-    -- Меняем цвет (вкл/выкл аддон)
     if ns.IsActive() then
         icon:SetDesaturated(false)
         icon:SetVertexColor(1, 1, 1)
@@ -77,10 +111,9 @@ function ns.UpdateMinimapIcon()
 end
 
 -- -----------------------------------------------------------------------
--- Клики и Тултипы
+-- Клики и Тултипы (Без изменений)
 -- -----------------------------------------------------------------------
 
--- Локальная функция для отрисовки тултипа (чтобы вызывать ее на лету)
 local function ShowTooltip(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:AddLine(addonName)
@@ -103,62 +136,39 @@ end
 
 minimapButton:RegisterForClicks("RightButtonUp", "LeftButtonUp")
 minimapButton:SetScript("OnClick", function(self, button)
-    -- Shift + Клик: Смена режима закрепления
     if IsShiftKeyDown() then
         if InCombatLockdown() then
             print("|cffff0000[PartySpells]|r Нельзя менять закрепление заклинаний во время боя!")
             return
         end
-        
         PartySpellsDB.settings.lockSpells = not PartySpellsDB.settings.lockSpells
-        
-        -- Обновляем поведение кнопок
-        if ns.UpdateCastingBehavior then 
-            ns.UpdateCastingBehavior() 
-        end
-        
-        -- Синхронизируем окно настроек
+        if ns.UpdateCastingBehavior then ns.UpdateCastingBehavior() end
         local cb = _G[addonName .. "LockSpellsCheckbox"]
         if cb then cb:SetChecked(PartySpellsDB.settings.lockSpells) end
-        
-        -- Обновляем иконку
         ns.UpdateMinimapIcon()
-        
-        -- ПЕРЕРИСОВЫВАЕМ ТУЛТИП НА ЛЕТУ
-        if GameTooltip:IsOwned(self) then
-            ShowTooltip(self)
-        end
-        
+        if GameTooltip:IsOwned(self) then ShowTooltip(self) end
         return
     end
 
-    -- Обычные клики (без Shift)
     if button == "RightButton" then
         if ns.OpenSettings then ns.OpenSettings() end
     elseif button == "LeftButton" then
         if ns.ToggleActive then ns.ToggleActive() end
-        -- Также обновляем тултип на лету для смены статуса (Включен/Выключен)
-        if GameTooltip:IsOwned(self) then
-            ShowTooltip(self)
-        end
+        if GameTooltip:IsOwned(self) then ShowTooltip(self) end
     end
 end)
 
-minimapButton:SetScript("OnEnter", function(self)
-    ShowTooltip(self)
-end)
-
-minimapButton:SetScript("OnLeave", function()
-    GameTooltip:Hide()
-end)
+minimapButton:SetScript("OnEnter", function(self) ShowTooltip(self) end)
+minimapButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 -- -----------------------------------------------------------------------
--- Загрузка позиции и состояний при старте игры
+-- Загрузка позиции (Тут поправлен расчет дефолтного угла)
 -- -----------------------------------------------------------------------
 local initFrame = CreateFrame("Frame")
 initFrame:RegisterEvent("PLAYER_LOGIN")
 initFrame:SetScript("OnEvent", function()
-    local angle = (PartySpellsDB and PartySpellsDB.minimapAngle) or math.rad(225)
+    -- Если угла в базе нет, ставим стандартный (радианы)
+    local angle = (PartySpellsDB and PartySpellsDB.minimapAngle) or 3.92 -- 225 градусов
     UpdatePosition(angle)
     ns.UpdateMinimapIcon()
 end)
