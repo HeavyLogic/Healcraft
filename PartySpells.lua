@@ -215,54 +215,61 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
             flash:Hide()
             self:Hide()
         else
-            if PartySpellsDB.settings.flashMode == 1 then
-                flash:SetAlpha(1 - (self.elapsed / 0.6))
-            else
+            local s = PartySpellsDB.settings
+            local progress = self.elapsed / 0.6
+            
+            if s.flashMode == 1 then
+                flash:SetAlpha(1 - progress)
+            elseif s.flashMode == 2 then
                 flash:SetAlpha(1)
+            elseif s.flashMode == 3 then
+                -- 1. Плавное появление и затухание (Синусоида: 0 -> 1 -> 0)
+                flash:SetAlpha(math.sin(progress * math.pi))
+                
+                -- 2. Вращение текстуры по часовой стрелке
+                -- Вращаем на 90 градусов (math.pi / 2) за время анимации
+                local angle = progress * (math.pi / 2)
+                local cosA, sinA = math.cos(angle), math.sin(angle)
+                
+                -- Матрица поворота текстурных координат вокруг центра (0.5, 0.5)
+                local ULx, ULy = 0.5 - 0.5*cosA + 0.5*sinA, 0.5 - 0.5*sinA - 0.5*cosA
+                local LLx, LLy = 0.5 - 0.5*cosA - 0.5*sinA, 0.5 - 0.5*sinA + 0.5*cosA
+                local URx, URy = 0.5 + 0.5*cosA + 0.5*sinA, 0.5 + 0.5*sinA - 0.5*cosA
+                local LRx, LRy = 0.5 + 0.5*cosA - 0.5*sinA, 0.5 + 0.5*sinA + 0.5*cosA
+                
+                flash:SetTexCoord(ULx, ULy, LLx, LLy, URx, URy, LRx, LRy)
             end
         end
     end)
 
     slot.PlayFlash = function()
         local s = PartySpellsDB.settings
+        if not s.flashMode or s.flashMode == 0 then return end 
+
         flash:ClearAllPoints()
+        flash:SetTexCoord(0, 1, 0, 1) -- Обязательно сбрасываем координаты в дефолт
         
         if s.flashMode == 1 then
             flash:SetAllPoints(slot.icon)
             flash:SetTexture(0, 1, 0, 0.6)
-            flash:SetVertexColor(1, 1, 1, 1) -- Сброс цвета на всякий случай
-        else
-            -- Режим 2: Идеальная копия синей рамки, только зеленая
-            flash:SetAllPoints(slot) -- Точно по размеру слота, как и hl
+            flash:SetVertexColor(1, 1, 1, 1)
+        elseif s.flashMode == 2 then
+            flash:SetAllPoints(slot)
             flash:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
-            flash:SetVertexColor(0, 1, 0, 1) -- Красим текстуру в ярко-зеленый
+            flash:SetVertexColor(0, 1, 0, 1)
+        elseif s.flashMode == 3 then
+            flash:SetPoint("CENTER", slot, "CENTER", 0, 0)
+            flash:SetSize(s.slotSize * 1.25, s.slotSize * 1.25) -- Меньше в 2 раза
+            flash:SetTexture("Interface\\Cooldown\\star4")
+            flash:SetVertexColor(1, 1, 1, 1) -- Белый цвет
         end
         
-        flash:SetAlpha(1)
+        -- Для режима 3 альфа стартует с 0, чтобы появиться плавно
+        flash:SetAlpha(s.flashMode == 3 and 0 or 1)
         flash:Show()
         fader.elapsed = 0
         fader:Show()
     end
-
-    local fader = CreateFrame("Frame", nil, slot)
-    fader:Hide()
-    fader.elapsed = 0
-    fader:SetScript("OnUpdate", function(self, elapsed)
-        self.elapsed = self.elapsed + elapsed
-        -- Увеличили время до 600 мс (0.6 сек)
-        if self.elapsed >= 0.6 then
-            flash:Hide()
-            self:Hide()
-        else
-            if FLASH_MODE == 1 then
-                -- Плавное затухание
-                flash:SetAlpha(1 - (self.elapsed / 0.6))
-            else
-                -- Режим 2: Резко (просто держим яркость на 100% все 600мс)
-                flash:SetAlpha(1)
-            end
-        end
-    end)
 
     local hl = slot:CreateTexture(nil, "HIGHLIGHT")
     hl:SetTexture("Interface\\Buttons\\ButtonHilight-Square")

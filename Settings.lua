@@ -113,12 +113,19 @@ flashLabel:SetText("Режим вспышки баффа:")
 local function InitFlashDropdown(self, level, menuList)
     local info = UIDropDownMenu_CreateInfo()
     local options = {
+        { text = "0: Нет (Отключено)", value = 0 },
         { text = "1: Плавная заливка", value = 1 },
-        { text = "2: Резкая рамка", value = 2 }
+        { text = "2: Резкая рамка", value = 2 },
+        { text = "3: Отблеск (Bling)", value = 3 }
     }
     for _, opt in ipairs(options) do
         info.text = opt.text
         info.arg1 = opt.value
+        
+        -- Безопасная проверка: если база еще не загружена (экран загрузки), берем дефолт (2)
+        local currentMode = (PartySpellsDB and PartySpellsDB.settings and PartySpellsDB.settings.flashMode) or 2
+        info.checked = (currentMode == opt.value)
+        
         info.func = function(self, arg1)
             PartySpellsDB.settings.flashMode = arg1
             UIDropDownMenu_SetSelectedValue(flashDD, arg1)
@@ -128,6 +135,13 @@ local function InitFlashDropdown(self, level, menuList)
     end
 end
 UIDropDownMenu_Initialize(flashDD, InitFlashDropdown)
+
+local modeTexts = {
+    [0] = "0: Нет (Отключено)",
+    [1] = "1: Плавная заливка",
+    [2] = "2: Резкая рамка",
+    [3] = "3: Отблеск (Bling)"
+}
 
 -- -----------------------------------------------------------------------
 -- Синхронизация UI с базой при загрузке
@@ -148,6 +162,6 @@ initFrame:SetScript("OnEvent", function()
     offsetXSlider:SetValue(s.offsetX)
     offsetYSlider:SetValue(s.offsetY)
     
-    UIDropDownMenu_SetSelectedValue(flashDD, s.flashMode)
-    UIDropDownMenu_SetText(flashDD, s.flashMode == 1 and "1: Плавная заливка" or "2: Резкая рамка")
+	UIDropDownMenu_SetSelectedValue(flashDD, s.flashMode)
+    UIDropDownMenu_SetText(flashDD, modeTexts[s.flashMode] or "1: Плавная заливка")
 end)

@@ -55,7 +55,8 @@ local function CreateBuffSlot(parent, unitID)
                 if remain <= URGENT_TIME then
                     if not self.isUrgent then
                         self.isUrgent = true
-                        self.icon:SetVertexColor(0.7, 0.7, 0.7) -- Легкое затемнение
+                        -- 1. Сделали затемнение гораздо мягче (0.85 вместо 0.7)
+                        self.icon:SetVertexColor(0.85, 0.85, 0.85) 
                         if SHOW_TIMER then
                             self.timerText:SetFont(FONT_FILE, FONT_URGENT_SIZE, "OUTLINE")
                             self.timerText:SetTextColor(1, 0, 0)
@@ -72,8 +73,11 @@ local function CreateBuffSlot(parent, unitID)
                     end
                 end
 
-                if SHOW_TIMER then
+                -- 2. Рисуем текст ТОЛЬКО если осталось <= 20 секунд
+                if SHOW_TIMER and remain <= 20 then
                     self.timerText:SetText(math.ceil(remain))
+                else
+                    self.timerText:SetText("")
                 end
             else
                 self.expirationTime = 0
