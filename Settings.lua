@@ -40,46 +40,32 @@ function ns.SetActive(state)
 end
 function ns.ToggleActive() ns.SetActive(not ns.IsActive()) end
 function ns.OpenSettings()
-    InterfaceOptionsFrame_OpenToCategory(_G[addonName .. "GeneralPanel"])
-    InterfaceOptionsFrame_OpenToCategory(_G[addonName .. "GeneralPanel"])
+    InterfaceOptionsFrame_OpenToCategory(_G[addonName .. "MainPanel"])
+    InterfaceOptionsFrame_OpenToCategory(_G[addonName .. "MainPanel"])
 end
 
 -- -----------------------------------------------------------------------
--- Создание Окон Настроек (OmniCC Style)
+-- Создание Окна Настроек
 -- -----------------------------------------------------------------------
 local mainPanel = CreateFrame("Frame", addonName .. "MainPanel", UIParent)
 mainPanel.name = addonName
 InterfaceOptions_AddCategory(mainPanel)
 
-local generalPanel = CreateFrame("Frame", addonName .. "GeneralPanel", mainPanel)
-generalPanel.name = "General"
-generalPanel.parent = addonName
-InterfaceOptions_AddCategory(generalPanel)
-
-local buffsPanel = CreateFrame("Frame", addonName .. "BuffsPanel", mainPanel)
-buffsPanel.name = "Buffs"
-buffsPanel.parent = addonName
-InterfaceOptions_AddCategory(buffsPanel)
-
-mainPanel:SetScript("OnShow", function()
-    ns.OpenSettings()
-end)
-
 -- -----------------------------------------------------------------------
 -- Наполнение вкладки General
 -- -----------------------------------------------------------------------
-local title = generalPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+local title = mainPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 title:SetPoint("TOPLEFT", 16, -16)
 title:SetText("PartySpells: General")
 
-local activeCb = CreateFrame("CheckButton", addonName .. "ActiveCheckbox", generalPanel, "InterfaceOptionsCheckButtonTemplate")
+local activeCb = CreateFrame("CheckButton", addonName .. "ActiveCheckbox", mainPanel, "InterfaceOptionsCheckButtonTemplate")
 activeCb:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -16)
 _G[activeCb:GetName() .. "Text"]:SetText(" Включить аддон (Master Switch)")
 activeCb:SetScript("OnClick", function(self) ns.SetActive(self:GetChecked()) end)
 
 -- Шаблон создания слайдера
 local function CreateSlider(name, text, minVal, maxVal, step, dbKey, x, y)
-    local slider = CreateFrame("Slider", addonName..name.."Slider", generalPanel, "OptionsSliderTemplate")
+    local slider = CreateFrame("Slider", addonName..name.."Slider", mainPanel, "OptionsSliderTemplate")
     slider:SetPoint("TOPLEFT", activeCb, "BOTTOMLEFT", x, y)
     slider:SetMinMaxValues(minVal, maxVal)
     slider:SetValueStep(step)
@@ -107,7 +93,7 @@ local offsetXSlider = CreateSlider("OffsetX", "Смещение по X", -20, 30
 local offsetYSlider = CreateSlider("OffsetY", "Смещение по Y", -20, 30, 1, "offsetY", 200, -70)
 
 -- Выпадающий список (Dropdown)
-local flashDD = CreateFrame("Frame", addonName.."FlashDropdown", generalPanel, "UIDropDownMenuTemplate")
+local flashDD = CreateFrame("Frame", addonName.."FlashDropdown", mainPanel, "UIDropDownMenuTemplate")
 flashDD:SetPoint("TOPLEFT", activeCb, "BOTTOMLEFT", 180, -120) -- Сдвинут под правые слайдеры
 local flashLabel = flashDD:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 flashLabel:SetPoint("BOTTOMLEFT", flashDD, "TOPLEFT", 16, 3)
