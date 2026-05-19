@@ -1,12 +1,6 @@
 local addonName, ns = ...
 
 local ADDON_NAME  = "PartySpells"
-local SLOTS_COUNT = 3
-local SLOT_SIZE   = 32
-local SLOT_GAP    = 2
-local OFFSET_X    = 8
-local OFFSET_Y    = 0
-local FLASH_MODE = 2 -- 1 = Плавная заливка (Иммерсивно), 2 = Резкая зеленая рамка (Заметно)
 
 -- party1..4 only — player is NOT included
 -- PartyMemberFrame1 = first party member, etc.
@@ -26,16 +20,15 @@ local rows = {}
 -- -----------------------------------------------------------------------
 local function UpdateCooldowns()
     -- Проходим по всем созданным строкам
+    local s = PartySpellsDB.settings
     for unitID, row in pairs(rows) do
         -- Обновляем кулдауны только если фрейм игрока сейчас отображается
         if row.frame:IsVisible() then
-            for i = 1, SLOTS_COUNT do
+            for i = 1, s.slotsCount do
                 local slot = row.slots[i]
                 if slot.spellName then
-                    -- GetSpellCooldown понимает имя спелла в 3.3.5
                     local start, duration, enable = GetSpellCooldown(slot.spellName)
                     if start and duration then
-                        -- Эта стандартная функция WoW берет на себя всю отрисовку спиральки
                         CooldownFrame_SetTimer(slot.cd, start, duration, enable)
                     end
                 end
@@ -52,18 +45,20 @@ local rangeTimer = 0
 
 local rangeFrame = CreateFrame("Frame")
 rangeFrame:SetScript("OnUpdate", function(self, elapsed)
-    -- Накапливаем время, прошедшее с предыдущего кадра
+    if not ns.IsActive() then return end
+
     rangeTimer = rangeTimer + elapsed
-    
+
     -- Как только набралось 0.2 сек, делаем проверку
     if rangeTimer >= RANGE_CHECK_INTERVAL then
-        rangeTimer = 0 -- Сбрасываем таймер
+        rangeTimer = 0
+        local s = PartySpellsDB.settings
         
         -- Проходим только по существующим строкам
         for unitID, row in pairs(rows) do
             -- Проверяем только если строка видима (член группы существует)
             if row.frame:IsVisible() then
-                for i = 1, SLOTS_COUNT do
+                for i = 1, s.slotsCount do
                     local slot = row.slots[i]
                     if slot.spellName then
                         -- IsSpellInRange нативно понимает строковое имя спелла в 3.3.5
@@ -167,26 +162,14 @@ local function ClearSlot(slot)
     end
     ns.UpdateSlotsVisibility()
 end
-
--- Функция для вызова вспышки из других файлов
-function ns.FlashSpellSlot(unitID, spellName)
-    if rows[unitID] then
-        for i = 1, SLOTS_COUNT do
-            local slot = rows[unitID].slots[i]
-            if slot.spellName == spellName then
-                slot.PlayFlash()
-                break
-            end
-        end
-    end
-end
 -- -----------------------------------------------------------------------
 -- Create one spell slot
 -- -----------------------------------------------------------------------
 
 local function CreateSpellSlot(parent, unitID, slotIndex)
+    local s = PartySpellsDB.settings
     local slot = CreateFrame("Button", nil, parent, "SecureActionButtonTemplate")
-    slot:SetSize(SLOT_SIZE, SLOT_SIZE)
+    slot:SetSize(s.slotSize, s.slotSize)
     slot.unitID    = unitID
     slot.slotIndex = slotIndex
     slot.spellName = nil
@@ -221,19 +204,45 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
 
     local flash = slot:CreateTexture(nil, "OVERLAY")
     flash:SetBlendMode("ADD")
-    
-    if FLASH_MODE == 1 then
-        flash:SetAllPoints(icon)
-        flash:SetTexture(0, 1, 0, 0.6)
-    else
-        flash:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
-        flash:SetVertexColor(0, 1, 0, 1)
-        -- Привязываем центр рамки к центру СЛОТА, а не иконки
-        flash:SetPoint("CENTER", slot, "CENTER", 0, 0)
-        -- Множитель 1.8 делает текстуру достаточно большой, чтобы покрыть бордер слота
-        flash:SetSize(SLOT_SIZE * 1.8, SLOT_SIZE * 1.8)
-    end
     flash:Hide()
+
+    local fader = CreateFrame("Frame", nil, slot)
+    fader:Hide()
+    fader.elapsed = 0
+    fader:SetScript("OnUpdate", function(self, elapsed)
+        self.elapsed = self.elapsed + elapsed
+        if self.elapsed >= 0.6 then
+            flash:Hide()
+            self:Hide()
+        else
+            if PartySpellsDB.settings.flashMode == 1 then
+                flash:SetAlpha(1 - (self.elapsed / 0.6))
+            else
+                flash:SetAlpha(1)
+            end
+        end
+    end)
+
+    slot.PlayFlash = function()
+        local s = PartySpellsDB.settings
+        flash:ClearAllPoints()
+        
+        if s.flashMode == 1 then
+            flash:SetAllPoints(slot.icon)
+            flash:SetTexture(0, 1, 0, 0.6)
+            flash:SetVertexColor(1, 1, 1, 1) -- Сброс цвета на всякий случай
+        else
+            -- Режим 2: Идеальная копия синей рамки, только зеленая
+            flash:SetAllPoints(slot) -- Точно по размеру слота, как и hl
+            flash:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
+            flash:SetVertexColor(0, 1, 0, 1) -- Красим текстуру в ярко-зеленый
+        end
+        
+        flash:SetAlpha(1)
+        flash:Show()
+        fader.elapsed = 0
+        fader:Show()
+    end
 
     local fader = CreateFrame("Frame", nil, slot)
     fader:Hide()
@@ -255,17 +264,11 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
         end
     end)
 
-    slot.PlayFlash = function()
-        flash:SetAlpha(1)
-        flash:Show()
-        fader.elapsed = 0
-        fader:Show()
-    end
-
     local hl = slot:CreateTexture(nil, "HIGHLIGHT")
     hl:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
     hl:SetAllPoints(slot)
     hl:SetBlendMode("ADD")
+    slot.hl = hl -- Сохраняем, чтобы обращаться к ней позже!
 
     slot:EnableMouse(true)
     slot:RegisterForClicks("AnyUp")
@@ -391,22 +394,16 @@ end
 -- Create row for one party member
 -- -----------------------------------------------------------------------
 
+local MAX_SUPPORTED_SLOTS = 5
+
 local function CreateRow(unitID, anchor)
     if rows[unitID] then return end
 
     local row = CreateFrame("Frame", ADDON_NAME .. "Row_" .. unitID, UIParent)
-    local totalWidth = SLOTS_COUNT * SLOT_SIZE + (SLOTS_COUNT - 1) * SLOT_GAP
-    row:SetSize(totalWidth, SLOT_SIZE)
-    row:SetPoint("LEFT", anchor, "RIGHT", OFFSET_X, OFFSET_Y)
-
+    -- Размеры зададутся позже в ns.RefreshLayout
     local slots = {}
-    for i = 1, SLOTS_COUNT do
+    for i = 1, MAX_SUPPORTED_SLOTS do
         local slot = CreateSpellSlot(row, unitID, i)
-        if i == 1 then
-            slot:SetPoint("LEFT", row, "LEFT", 0, 0)
-        else
-            slot:SetPoint("LEFT", slots[i-1], "RIGHT", SLOT_GAP, 0)
-        end
         slots[i] = slot
     end
 
@@ -420,15 +417,16 @@ end
 
 local function LoadRow(unitID)
     if not rows[unitID] then return end
-    for i = 1, SLOTS_COUNT do
+    local s = PartySpellsDB.settings
+    for i = 1, s.slotsCount do
         local savedName = LoadSlot(unitID, i)
         if savedName then
-            -- print("[PartySpells] LOAD unit=" .. unitID .. " slot=" .. i .. " name=" .. savedName)
+            print("[PartySpells] LOAD unit=" .. unitID .. " slot=" .. i .. " name=" .. savedName)
             local texture = GetTextureByName(savedName)
             if texture then
                 FillSlot(rows[unitID].slots[i], savedName, texture)
             else
-                -- print("[PartySpells] LOAD FAILED: texture not found for '" .. savedName .. "'")
+                print("[PartySpells] LOAD FAILED: texture not found for '" .. savedName .. "'")
             end
         end
     end
@@ -438,19 +436,29 @@ end
 -- -----------------------------------------------------------------------
 
 local function RefreshRows()
-    local groupSize = GetNumPartyMembers()  -- excludes player, 0 if solo
-    -- print("[PartySpells] RefreshRows groupSize=" .. groupSize)
+    local groupSize = GetNumPartyMembers()
+    local isActive = ns.IsActive() -- Проверяем мастер-свитч
 
     for i = 1, 4 do
         local unitID = "party" .. i
         if rows[unitID] then
-            if i <= groupSize then
+            -- Если аддон включен И игрок есть в группе
+            if isActive and i <= groupSize then
                 rows[unitID].frame:Show()
-                -- print("[PartySpells] Show row " .. unitID)
             else
+                -- Иначе прячем все слоты
                 rows[unitID].frame:Hide()
-                -- print("[PartySpells] Hide row " .. unitID)
             end
+        end
+    end
+end
+
+function ns.RefreshAllVisibility()
+    RefreshRows()
+    ns.UpdateSlotsVisibility()
+    for _, unitID in ipairs(UNITS) do
+        if ns.UpdateBuffs then
+            ns.UpdateBuffs(unitID)
         end
     end
 end
@@ -458,13 +466,27 @@ end
 -- -----------------------------------------------------------------------
 -- API для других модулей аддона
 -- -----------------------------------------------------------------------
+-- Функция для вызова вспышки из других файлов
+function ns.FlashSpellSlot(unitID, spellName)
+    if rows[unitID] then
+        local s = PartySpellsDB.settings
+        for i = 1, s.slotsCount do
+            local slot = rows[unitID].slots[i]
+            if slot.spellName == spellName then
+                slot.PlayFlash()
+                break
+            end
+        end
+    end
+end
+
 function ns.GetActiveSpells(unitID)
     local activeSpells = {}
     if rows[unitID] then
-        for i = 1, SLOTS_COUNT do
+        local s = PartySpellsDB.settings
+        for i = 1, s.slotsCount do
             local spellName = rows[unitID].slots[i].spellName
             if spellName then
-                -- Добавляем имя спелла как ключ для быстрого поиска
                 activeSpells[spellName] = true
             end
         end
@@ -472,25 +494,60 @@ function ns.GetActiveSpells(unitID)
     return activeSpells
 end
 
--- скрывает пустые слоты, если мы не перетаскиваем заклинание
 function ns.UpdateSlotsVisibility()
     local cursorType = GetCursorInfo()
     local isDraggingSpell = (cursorType == "spell")
+    local s = PartySpellsDB.settings
 
     for unitID, row in pairs(rows) do
-        for i = 1, SLOTS_COUNT do
+        for i = 1, s.slotsCount do
             local slot = row.slots[i]
             if slot.spellName or isDraggingSpell then
-                -- Показываем фон и рамку
+                -- Показываем слот
                 slot:SetBackdropColor(0, 0, 0, 0.85)
                 slot:SetBackdropBorderColor(0.35, 0.35, 0.35, 1)
+                -- Возвращаем синюю подсветку при наведении
+                if slot.hl then slot.hl:SetAlpha(1) end 
             else
-                -- Делаем слот полностью прозрачным
+                -- Делаем слот невидимым
                 slot:SetBackdropColor(0, 0, 0, 0)
                 slot:SetBackdropBorderColor(0, 0, 0, 0)
+                -- Отключаем свечение при наведении (прячем слой)
+                if slot.hl then slot.hl:SetAlpha(0) end 
             end
         end
     end
+end
+
+function ns.RefreshLayout()
+    if not PartySpellsDB or not PartySpellsDB.settings then return end
+    local s = PartySpellsDB.settings
+
+    for unitID, rowData in pairs(rows) do
+        local anchor = FRAMES[unitID]
+        if anchor then
+            local totalWidth = s.slotsCount * s.slotSize + (s.slotsCount - 1) * s.slotGap
+            rowData.frame:SetSize(totalWidth, s.slotSize)
+            rowData.frame:SetPoint("LEFT", anchor, "RIGHT", s.offsetX, s.offsetY)
+
+            for i = 1, MAX_SUPPORTED_SLOTS do
+                local slot = rowData.slots[i]
+                if i <= s.slotsCount then
+                    slot:SetSize(s.slotSize, s.slotSize)
+                    slot:ClearAllPoints()
+                    if i == 1 then
+                        slot:SetPoint("LEFT", rowData.frame, "LEFT", 0, 0)
+                    else
+                        slot:SetPoint("LEFT", rowData.slots[i-1], "RIGHT", s.slotGap, 0)
+                    end
+                    slot:Show()
+                else
+                    slot:Hide()
+                end
+            end
+        end
+    end
+    ns.UpdateSlotsVisibility()
 end
 
 -- -----------------------------------------------------------------------
@@ -507,31 +564,27 @@ initFrame:RegisterEvent("CURSOR_UPDATE")
 
 initFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "PLAYER_LOGIN" then
-        -- print("[PartySpells] PLAYER_LOGIN")
+        print("[PartySpells] PLAYER_LOGIN")
 
+        -- 1. Сначала загружаем базу и настройки
+        ns.InitDB()
+
+        -- 2. Затем создаем UI
         for _, unitID in ipairs(UNITS) do
             local anchor = FRAMES[unitID]
             if anchor then
                 CreateRow(unitID, anchor)
                 LoadRow(unitID)
-                
                 ns.CreateBuffRow(unitID)
-                ns.UpdateBuffs(unitID)
             end
         end
 
-        if SpellBookFrame then
-            SpellBookFrame:SetMovable(true)
-            SpellBookFrame:EnableMouse(true)
-            SpellBookFrame:RegisterForDrag("LeftButton")
-            SpellBookFrame:SetScript("OnDragStart", function(f) f:StartMoving() end)
-            SpellBookFrame:SetScript("OnDragStop",  function(f) f:StopMovingOrSizing() end)
-        end
+        -- 3. Применяем настройки размера/смещения
+        ns.RefreshLayout()
 
-        RefreshRows()
-        UpdateCooldowns()
-        ns.UpdateSlotsVisibility()
-        -- print("[PartySpells] loaded, slots per member: " .. SLOTS_COUNT)
+        -- 4. Обновляем видимость (в зависимости от Master Switch)
+        ns.RefreshAllVisibility()
+
 
     elseif event == "PARTY_MEMBERS_CHANGED" then
         -- print("[PartySpells] PARTY_MEMBERS_CHANGED")
@@ -541,14 +594,14 @@ initFrame:SetScript("OnEvent", function(self, event, arg1)
         end
 
     elseif event == "SPELL_UPDATE_COOLDOWN" then
-        UpdateCooldowns()
+        if ns.IsActive() then UpdateCooldowns() end
 
     elseif event == "CURSOR_UPDATE" then
-        ns.UpdateSlotsVisibility()
+        if ns.IsActive() then ns.UpdateSlotsVisibility() end
 
     elseif event == "UNIT_AURA" then
         -- Вызываем функцию обновления баффов
         -- Она сама внутри проверит, относится ли этот arg1 к нашей группе
-        ns.UpdateBuffs(arg1)
+        if ns.IsActive() then ns.UpdateBuffs(arg1) end
     end
 end)

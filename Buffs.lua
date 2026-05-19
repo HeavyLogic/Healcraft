@@ -3,7 +3,7 @@ local addonName, ns = ...
 local MAX_BUFFS = 8
 local BUFF_SIZE = 16
 local BUFF_GAP  = 2
-local BUFF_OFFSET_Y = -4
+local BUFF_OFFSET_Y = -1
 
 local SHOW_TIMER = true
 local URGENT_TIME = 5
@@ -127,6 +127,19 @@ end
 function ns.UpdateBuffs(unitID)
     local rowData = buffRows[unitID]
     if not rowData then return end
+    
+    if not ns.IsActive() then
+        for i = 1, MAX_BUFFS do
+            local slot = rowData.slots[i]
+            slot:Hide()
+            slot.buffIndex = nil
+            slot.expirationTime = 0
+            slot.isUrgent = false
+            slot.timerText:SetText("")
+        end
+        previousBuffs[unitID] = {}
+        return
+    end
 
     local activeSpells = ns.GetActiveSpells(unitID)
     local currentBuffs = {}

@@ -5,5 +5,7 @@
 ## Version: 1
 ## SavedVariables: PartySpellsDB
 
+Settings.lua
+Minimap.lua
 Buffs.lua
 PartySpells.lua
