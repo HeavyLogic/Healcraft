@@ -415,7 +415,7 @@ end
 local function CreateRow(unitID, anchor)
     if rows[unitID] then return end
 
-    local row = CreateFrame("Frame", ADDON_NAME .. "Row_" .. unitID, UIParent)
+    local row = CreateFrame("Frame", ADDON_NAME .. "Row_" .. unitID, anchor) 
     -- Размеры зададутся позже в ns.RefreshLayout
     local slots = {}
     for i = 1, MAX_SUPPORTED_SLOTS do
@@ -534,6 +534,9 @@ end
 
 function ns.RefreshLayout()
     if not PartySpellsDB or not PartySpellsDB.settings then return end
+    -- Если мы в бою, менять позиции нельзя (из-за Secure кнопок внутри)
+    if InCombatLockdown() then return end 
+
     local s = PartySpellsDB.settings
 
     for unitID, rowData in pairs(rows) do
@@ -541,13 +544,15 @@ function ns.RefreshLayout()
         if anchor then
             local totalWidth = s.slotsCount * s.slotSize + (s.slotsCount - 1) * s.slotGap
             rowData.frame:SetSize(totalWidth, s.slotSize)
-            -- TODO: не работает обновление смещения
-            print(s.offsetX .. ' ' .. s.offsetY)
-            -- print(rowData.frame:GetNumPoints())
-            -- rowData.frame:ClearAllPoints()
-            rowData.frame:SetPoint("LEFT", anchor, "RIGHT", s.offsetX, s.offsetY)
+            
+            rowData.frame:ClearAllPoints()
+            -- Привязываем LEFT нашего фрейма к RIGHT якоря (PartyMemberFrame)
+            -- Используем числа напрямую. 
+            rowData.frame:SetPoint("LEFT", anchor, "RIGHT", tonumber(s.offsetX) or 0, tonumber(s.offsetY) or 0)
+            
             rowData.frame:SetAlpha(s.alphaButtons / 100)
 
+            -- Обновляем размеры и положение самих слотов
             for i = 1, MAX_SUPPORTED_SLOTS do
                 local slot = rowData.slots[i]
                 if i <= s.slotsCount then
