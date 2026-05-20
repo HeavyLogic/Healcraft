@@ -4,9 +4,9 @@ local addonName, ns = ...
 -- Database Initialization
 -- -----------------------------------------------------------------------
 function ns.InitDB()
-    if not PartySpellsDB then PartySpellsDB = {} end
-    if type(PartySpellsDB.isActive) ~= "boolean" then PartySpellsDB.isActive = true end
-    if not PartySpellsDB.settings then PartySpellsDB.settings = {} end
+    if not HealcraftDB then HealcraftDB = {} end
+    if type(HealcraftDB.isActive) ~= "boolean" then HealcraftDB.isActive = true end
+    if not HealcraftDB.settings then HealcraftDB.settings = {} end
 
     -- Default settings
     local defs = {
@@ -27,8 +27,8 @@ function ns.InitDB()
         showTooltipsBuffs = false,
     }
     for k, v in pairs(defs) do
-        if PartySpellsDB.settings[k] == nil then
-            PartySpellsDB.settings[k] = v
+        if HealcraftDB.settings[k] == nil then
+            HealcraftDB.settings[k] = v
         end
     end
 end
@@ -52,11 +52,11 @@ end
 -- Master-Switch logic
 -- -----------------------------------------------------------------------
 function ns.IsActive()
-    return PartySpellsDB and PartySpellsDB.settings.isActive
+    return HealcraftDB and HealcraftDB.settings.isActive
 end
 
 function ns.SetActive(state)
-    PartySpellsDB.settings.isActive = state
+    HealcraftDB.settings.isActive = state
     if _G[addonName .. "isActiveCheckButton"] then _G[addonName .. "isActiveCheckButton"]:SetChecked(state) end
     if ns.UpdateMinimapIcon then ns.UpdateMinimapIcon() end
     if ns.RefreshAllVisibility then ns.RefreshAllVisibility() end
@@ -115,7 +115,7 @@ local function CreateSlider(text, minVal, maxVal, step, dbKey, x, y)
     
     slider:SetScript("OnValueChanged", function(self, value)
         value = math.floor(value + 0.5) -- Round to integers
-        PartySpellsDB.settings[dbKey] = value
+        HealcraftDB.settings[dbKey] = value
         _G[self:GetName().."Text"]:SetText(text .. ": " .. value)
         RefreshVisuals(workingPanel.name)
     end)
@@ -132,7 +132,7 @@ local function CreateCheckbox(text, dbKey, x, y, callback)
         if callback then
             callback(self)
         else
-            PartySpellsDB.settings[dbKey] = (self:GetChecked() ~= nil)
+            HealcraftDB.settings[dbKey] = (self:GetChecked() ~= nil)
             RefreshVisuals(workingPanel.name)
         end
     end)
@@ -145,7 +145,7 @@ end
 workingPanel = generalPanel
 alignFrom = generalPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 alignFrom:SetPoint("TOPLEFT", 16, -16)
-alignFrom:SetText("PartySpells: General")
+alignFrom:SetText("Healcraft: General")
 
 local gapYTitles = -16;
 local gapYSliders = -32;
@@ -187,10 +187,10 @@ local function InitFlashDropdown(self, level, menuList)
     for _, opt in ipairs(FLASH_OPTIONS) do
         info.text = opt.text
         info.arg1 = opt.value
-        local currentMode = (PartySpellsDB and PartySpellsDB.settings and PartySpellsDB.settings.flashMode) or 2
+        local currentMode = (HealcraftDB and HealcraftDB.settings and HealcraftDB.settings.flashMode) or 2
         info.checked = (currentMode == opt.value)
         info.func = function(self, arg1)
-            PartySpellsDB.settings.flashMode = arg1
+            HealcraftDB.settings.flashMode = arg1
             UIDropDownMenu_SetSelectedValue(flashDD, arg1)
             UIDropDownMenu_SetText(flashDD, opt.text)
         end
@@ -203,11 +203,11 @@ UIDropDownMenu_Initialize(flashDD, InitFlashDropdown)
 alignFrom = flashDD
 alignFrom = CreateCheckbox("Lock spells (instant cast, no drag&drop)", "lockSpells", dropdownsOffset, gapYCheckboxes-addYGap, function(self)
     if InCombatLockdown() then
-        print("|cffff0000[PartySpells]|r Cannot change this setting during combat!")
-        self:SetChecked(PartySpellsDB.settings.lockSpells)
+        print("|cffff0000[Healcraft]|r Cannot change this setting during combat!")
+        self:SetChecked(HealcraftDB.settings.lockSpells)
         return
     end
-    PartySpellsDB.settings.lockSpells = (self:GetChecked() ~= nil)
+    HealcraftDB.settings.lockSpells = (self:GetChecked() ~= nil)
     if ns.UpdateCastingBehavior then ns.UpdateCastingBehavior() end
 end)
 
@@ -221,7 +221,7 @@ alignFrom = CreateCheckbox("Show tooltips on spells", "showTooltips", 0, gapYChe
 workingPanel = buffsPanel;
 alignFrom = buffsPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 alignFrom:SetPoint("TOPLEFT", 16, -16)
-alignFrom:SetText("PartySpells: Buffs")
+alignFrom:SetText("Healcraft: Buffs")
 
 alignFrom = CreateCheckbox("Enable buffs", "buffsActive", 0, gapYTitles)
 alignFrom = CreateCheckbox("Show timer on buffs", "showTimer", 0, gapYCheckboxes)
@@ -235,7 +235,7 @@ local initFrame = CreateFrame("Frame")
 initFrame:RegisterEvent("PLAYER_LOGIN")
 initFrame:SetScript("OnEvent", function()
     ns.InitDB()
-    local s = PartySpellsDB.settings
+    local s = HealcraftDB.settings
 
     for dbKey, slider in pairs(SLIDERS) do
         slider:SetValue(s[dbKey])

@@ -1,11 +1,11 @@
 ## Interface: 30300
-## Title: PartySpells
+## Title: Healcraft
 ## Notes: Spell bars under your party members
 ## Author: HeavyLogic
 ## Version: 1
-## SavedVariables: PartySpellsDB
+## SavedVariables: HealcraftDB
 
 Settings.lua
 Minimap.lua
 Buffs.lua
-PartySpells.lua
+Healcraft.lua

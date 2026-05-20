@@ -1,6 +1,6 @@
 local addonName, ns = ...
 
-local ADDON_NAME  = "PartySpells"
+local ADDON_NAME  = "Healcraft"
 
 -- party1..4 only — player is NOT included
 -- PartyMemberFrame1 = first party member, etc.
@@ -20,8 +20,8 @@ local MAX_SUPPORTED_SLOTS = 5
 function ns.UpdateCastingBehavior()
     -- Check if DB is loaded. If not - default false (allowed to drag)
     local isLocked = false
-    if PartySpellsDB and PartySpellsDB.settings and type(PartySpellsDB.settings.lockSpells) == "boolean" then
-        isLocked = PartySpellsDB.settings.lockSpells
+    if HealcraftDB and HealcraftDB.settings and type(HealcraftDB.settings.lockSpells) == "boolean" then
+        isLocked = HealcraftDB.settings.lockSpells
     end
 
     local clickMode = isLocked and "AnyDown" or "AnyUp"
@@ -43,7 +43,7 @@ end
 -- -----------------------------------------------------------------------
 local function UpdateCooldowns()
     -- Iterate over all created rows
-    local s = PartySpellsDB.settings
+    local s = HealcraftDB.settings
     for unitID, row in pairs(rows) do
         -- Update cooldowns only if the player frame is currently visible
         if row.frame:IsVisible() then
@@ -75,7 +75,7 @@ rangeFrame:SetScript("OnUpdate", function(self, elapsed)
     -- Once 0.2 sec has passed, do the check
     if rangeTimer >= RANGE_CHECK_INTERVAL then
         rangeTimer = 0
-        local s = PartySpellsDB.settings
+        local s = HealcraftDB.settings
         
         -- Iterate only over existing rows
         for unitID, row in pairs(rows) do
@@ -106,8 +106,8 @@ end)
 -- -----------------------------------------------------------------------
 
 local function GetDB()
-    if not PartySpellsDB then PartySpellsDB = {} end
-    return PartySpellsDB
+    if not HealcraftDB then HealcraftDB = {} end
+    return HealcraftDB
 end
 
 local function SaveSlot(unitID, slotIndex, spellName)
@@ -185,7 +185,7 @@ end
 -- -----------------------------------------------------------------------
 
 local function CreateSpellSlot(parent, unitID, slotIndex)
-    local s = PartySpellsDB.settings
+    local s = HealcraftDB.settings
     local slot = CreateFrame("Button", nil, parent, "SecureActionButtonTemplate")
     slot:SetSize(s.slotSize, s.slotSize)
     slot.unitID    = unitID
@@ -233,7 +233,7 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
             flash:Hide()
             self:Hide()
         else
-            local s = PartySpellsDB.settings
+            local s = HealcraftDB.settings
             local progress = self.elapsed / 0.6
             
             if s.flashMode == 1 then
@@ -261,7 +261,7 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     end)
 
     slot.PlayFlash = function()
-        local s = PartySpellsDB.settings
+        local s = HealcraftDB.settings
         if not s.flashMode or s.flashMode == 0 then return end 
 
         flash:ClearAllPoints()
@@ -299,7 +299,7 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     slot:RegisterForDrag("LeftButton")
 
     slot:SetScript("OnEnter", function(self)
-        if not PartySpellsDB.settings.showTooltips then return end
+        if not HealcraftDB.settings.showTooltips then return end
         
         if self.spellName then
             local texture = GetTextureByName(self.spellName)
@@ -401,7 +401,7 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
 
     -- drag start (pick up spell from slot like action bar)
     slot:SetScript("OnDragStart", function(self)
-        if self.spellName and not InCombatLockdown() and not PartySpellsDB.settings.lockSpells then
+        if self.spellName and not InCombatLockdown() and not HealcraftDB.settings.lockSpells then
             PickupSpell(self.spellName)
             ClearSlot(self)
         end
@@ -435,7 +435,7 @@ end
 
 local function LoadRow(unitID)
     if not rows[unitID] then return end
-    local s = PartySpellsDB.settings
+    local s = HealcraftDB.settings
     for i = 1, s.slotsCount do
         local savedName = LoadSlot(unitID, i)
         if savedName then
@@ -484,7 +484,7 @@ end
 -- Function to trigger flash from other files
 function ns.FlashSpellSlot(unitID, spellName)
     if rows[unitID] then
-        local s = PartySpellsDB.settings
+        local s = HealcraftDB.settings
         for i = 1, s.slotsCount do
             local slot = rows[unitID].slots[i]
             if slot.spellName == spellName then
@@ -498,7 +498,7 @@ end
 function ns.GetActiveSpells(unitID)
     local activeSpells = {}
     if rows[unitID] then
-        local s = PartySpellsDB.settings
+        local s = HealcraftDB.settings
         for i = 1, s.slotsCount do
             local spellName = rows[unitID].slots[i].spellName
             if spellName then
@@ -512,7 +512,7 @@ end
 function ns.UpdateSlotsVisibility()
     local cursorType = GetCursorInfo()
     local isDraggingSpell = (cursorType == "spell")
-    local s = PartySpellsDB.settings
+    local s = HealcraftDB.settings
 
     for unitID, row in pairs(rows) do
         for i = 1, s.slotsCount do
@@ -535,11 +535,11 @@ function ns.UpdateSlotsVisibility()
 end
 
 function ns.RefreshLayout()
-    if not PartySpellsDB or not PartySpellsDB.settings then return end
+    if not HealcraftDB or not HealcraftDB.settings then return end
     -- Cannot change positions during combat (due to Secure buttons inside)
     if InCombatLockdown() then return end 
 
-    local s = PartySpellsDB.settings
+    local s = HealcraftDB.settings
 
     for unitID, rowData in pairs(rows) do
         local anchor = FRAMES[unitID]

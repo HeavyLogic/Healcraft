@@ -77,8 +77,8 @@ minimapButton:SetScript("OnDragStart", function(self)
         
         local angle = math.atan2(py - my, px - mx)
         
-        if not PartySpellsDB then PartySpellsDB = {} end
-        PartySpellsDB.minimapAngle = angle
+        if not HealcraftDB then HealcraftDB = {} end
+        HealcraftDB.minimapAngle = angle
         
         UpdatePosition(angle)
     end)
@@ -93,9 +93,9 @@ end)
 -- Icon visual status
 -- -----------------------------------------------------------------------
 function ns.UpdateMinimapIcon()
-    if not PartySpellsDB or not PartySpellsDB.settings then return end
+    if not HealcraftDB or not HealcraftDB.settings then return end
 
-    if PartySpellsDB.settings.lockSpells then
+    if HealcraftDB.settings.lockSpells then
         icon:SetTexture("Interface\\Icons\\Spell_Nature_Rejuvenation") 
     else
         icon:SetTexture("Interface\\Icons\\Spell_Nature_ResistNature") 
@@ -121,7 +121,7 @@ local function ShowTooltip(self)
     local statusText = ns.IsActive() and "|cff00ff00On|r" or "|cff808080Off|r"
     GameTooltip:AddLine("Status: " .. statusText)
     
-    local lockText = (PartySpellsDB and PartySpellsDB.settings and PartySpellsDB.settings.lockSpells) 
+    local lockText = (HealcraftDB and HealcraftDB.settings and HealcraftDB.settings.lockSpells) 
                      and "|cff00ff00Yes|r" 
                      or "|cff808080No|r"
     GameTooltip:AddLine("Locked: " .. lockText)
@@ -138,13 +138,13 @@ minimapButton:RegisterForClicks("RightButtonUp", "LeftButtonUp")
 minimapButton:SetScript("OnClick", function(self, button)
     if IsShiftKeyDown() then
         if InCombatLockdown() then
-            print("|cffff0000[PartySpells]|r Cannot change spell locking during combat!")
+            print("|cffff0000[Healcraft]|r Cannot change spell locking during combat!")
             return
         end
-        PartySpellsDB.settings.lockSpells = not PartySpellsDB.settings.lockSpells
+        HealcraftDB.settings.lockSpells = not HealcraftDB.settings.lockSpells
         if ns.UpdateCastingBehavior then ns.UpdateCastingBehavior() end
         local cb = _G[addonName .. "lockSpellsCheckButton"]
-        if cb then cb:SetChecked(PartySpellsDB.settings.lockSpells) end
+        if cb then cb:SetChecked(HealcraftDB.settings.lockSpells) end
         ns.UpdateMinimapIcon()
         if GameTooltip:IsOwned(self) then ShowTooltip(self) end
         return
@@ -168,7 +168,7 @@ local initFrame = CreateFrame("Frame")
 initFrame:RegisterEvent("PLAYER_LOGIN")
 initFrame:SetScript("OnEvent", function()
     -- If no angle in DB, use default (radians)
-    local angle = (PartySpellsDB and PartySpellsDB.minimapAngle) or 3.92 -- 225 degrees
+    local angle = (HealcraftDB and HealcraftDB.minimapAngle) or 3.92 -- 225 degrees
     UpdatePosition(angle)
     ns.UpdateMinimapIcon()
 end)

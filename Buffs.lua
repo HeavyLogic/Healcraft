@@ -129,7 +129,7 @@ local function CreateBuffSlot(parent, unitID)
 
     slot:EnableMouse(true)
     slot:SetScript("OnEnter", function(self)
-        if not PartySpellsDB.settings.showTooltipsBuffs then return end
+        if not HealcraftDB.settings.showTooltipsBuffs then return end
         
         if self.buffIndex then
             GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT", 15, -25)
@@ -176,7 +176,7 @@ end
 function ns.UpdateBuffs(unitID)
     if not unitID or not buffRows[unitID] then return end
     local rowData = buffRows[unitID]
-    local settings = PartySpellsDB.settings
+    local settings = HealcraftDB.settings
     
     rowData.frame:SetAlpha(settings.alphaBuffs / 100)
     
