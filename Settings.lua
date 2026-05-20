@@ -157,7 +157,6 @@ local addYGap = 7;
 -- Master switch
 local activeCb = CreateCheckbox("Enable addon (Master Switch)", "isActive", 0, gapYTitles, function(self)
     ns.SetActive(self:GetChecked() ~= nil)
-    print(self:GetName())
 end)
 
 -- === Left slider column ===
