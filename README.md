@@ -4,7 +4,7 @@ Addon for WoW 3.3.5 (Wrath of the Lich King).
 
 Healing-focused addon that places customizable spell buttons next to party member unit frames, allowing healers to quickly cast heals, buffs, dispels, or any other spells on specific party members at a glance.
 
-Inspired by the Healium addon. But designed to preserve the original WoW look and feel with a lightweight, vanilla-friendly interface instead of replacing your UI with large custom healing panels.
+Inspired by the Healium addon. Designed to preserve the original WoW look and feel with a lightweight, vanilla-friendly interface instead of replacing your UI with large custom healing panels.
 
 ## Features
 
