@@ -2,27 +2,30 @@
 
 Addon for WoW 3.3.5 (Wrath of the Lich King).
 
-Places customizable spell buttons next to your party members' unit frames, letting you quickly cast heals, buffs, or any other spells on specific party members at a glance.
+Healing-focused addon that places customizable spell buttons next to party member unit frames, allowing healers to quickly cast heals, buffs, dispels, or any other spells on specific party members at a glance.
 
 ## Features
 
-- **Dragable spellbook** — First things first - you can now drag your spellbook so it won't cover your party members' frames.
+- **Draggable Spellbook** — You can drag your spellbook anywhere on the screen so it doesn't cover your party frames.
 
-### Spell slots
+### Spell Slots
 
-> Drag spells from your spellbook directly onto party member frames.
+> Drag spells directly from your spellbook onto party member frames.
 
-- **Slots number** — You got up to 5 slots per member (configurable).
-- **Lock spells** — When this mode is on, you cast spells on press, not on release. And it disables drag&drop. It turns on automatically in combat.
-- **Range Check** — Slots turn red when party member is out of range.
-- **Cooldown Display** — Real-time cooldown spiral on every spell slot.
-- **Flash Effect** — When buff expires, the corresponding spell slot flashes to grab your attention (there's different modes in settings).
-- **Settings** — Adjust slot size, spacing, transparency, offsets, number of slots, etc.
+- **Slot Count** — Up to 5 slots per party member (configurable).
+- **Spell Locking** — When enabled, spells are cast on button press instead of release, and drag & drop is disabled. Automatically enabled during combat.
+- **Range Check** — Slots turn red when the target is out of range.
+- **Cooldown Display** — Cooldown spiral displayed on each spell slot.
+- **Flash Effect** — When a buff expires, the corresponding spell slot flashes to grab your attention (multiple modes available in settings).
 
 ### Buff Tracking
 
-> Monitors only your buffs that you've put in slots.
+> Tracks only buffs assigned to spell slots.
 
-- **Countdowns** - You can disable timers in settings.
-- **Spell stacks** - Some spells can stack, like druid's `Lifebloom`. This feature can show them.
-- **Minimap Button** — Quickly toggle the addon on/off, open settings, or lock/unlock spell slots by right-clicking or shift-clicking the minimap icon.
+- **Countdown Timers** — Can be disabled in settings.
+- **Spell Stacks** — Supports stackable spells such as druid's `Lifebloom`.
+
+### Settings
+
+- **Minimap Button** — Quickly enable or disable the addon, open settings, or lock/unlock spell slots using right-click or Shift+click on the minimap icon.
+- **Settings page** — Adjust slot size, spacing, transparency, offsets, slot count, and more.
