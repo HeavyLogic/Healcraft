@@ -4,10 +4,7 @@ Addon for WoW 3.3.5 (Wrath of the Lich King).
 
 Healing-focused addon that places customizable spell buttons next to party member unit frames, allowing healers to quickly cast heals, buffs, dispels, or any other spells on specific party members at a glance.
 
-Inspired by the Healium addon.
-
-Designed to preserve the original WoW look and feel with a lightweight, vanilla-friendly interface instead of replacing your UI with large custom healing panels.
-
+Inspired by the Healium addon. But designed to preserve the original WoW look and feel with a lightweight, vanilla-friendly interface instead of replacing your UI with large custom healing panels.
 
 ## Features
 
@@ -34,3 +31,8 @@ Designed to preserve the original WoW look and feel with a lightweight, vanilla-
 
 - **Minimap Button** — Quickly enable or disable the addon, open settings, or lock/unlock spell slots using right-click or Shift+click on the minimap icon.
 - **Settings page** — Adjust slot size, spacing, transparency, offsets, slot count, and more.
+
+### Other Addon Support
+
+- **SexyMap** — The minimap button can be moved freely and its position is remembered.
+- **MoveAnything** — When party frames are moved, spell buttons and buff indicators move with them.
