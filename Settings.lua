@@ -219,11 +219,11 @@ alignFrom = buffsPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 alignFrom:SetPoint("TOPLEFT", 16, -16)
 alignFrom:SetText("Healcraft: Buffs")
 
-alignFrom = CreateCheckbox(generalPanel, "Enable buffs", "buffsActive", 0, gapYTitles)
-alignFrom = CreateCheckbox(generalPanel, "Show timer on buffs", "showTimer", 0, gapYCheckboxes)
-alignFrom = CreateCheckbox(generalPanel, "Show spell stacks", "showStacks", 0, gapYCheckboxes)
-alignFrom = CreateCheckbox(generalPanel, "Show tooltips on buffs", "showTooltipsBuffs", 0, gapYCheckboxes)
-alignFrom = CreateSlider(generalPanel, "Buffs transparency", 10, 100, 5, "alphaBuffs", slidersOffset, gapYSliders+addYGap)
+alignFrom = CreateCheckbox(buffsPanel, "Enable buffs", "buffsActive", 0, gapYTitles)
+alignFrom = CreateCheckbox(buffsPanel, "Show timer on buffs", "showTimer", 0, gapYCheckboxes)
+alignFrom = CreateCheckbox(buffsPanel, "Show spell stacks", "showStacks", 0, gapYCheckboxes)
+alignFrom = CreateCheckbox(buffsPanel, "Show tooltips on buffs", "showTooltipsBuffs", 0, gapYCheckboxes)
+alignFrom = CreateSlider(buffsPanel, "Buffs transparency", 10, 100, 5, "alphaBuffs", slidersOffset, gapYSliders+addYGap)
 -- -----------------------------------------------------------------------
 -- Sync UI with DB on load
 -- -----------------------------------------------------------------------
