@@ -199,6 +199,8 @@ function ns.UpdateBuffs(unitID)
         local name, _, icon, stacks, _, duration, expirationTime, unitCaster = UnitBuff(unitID, i)
         if not name then break end
 
+        stacks = 9
+
         if activeSpells[name] and unitCaster == "player" then
             currentBuffs[name] = true
 
@@ -207,7 +209,7 @@ function ns.UpdateBuffs(unitID)
                 slot.icon:SetTexture(icon)
                 slot.buffIndex = i
                 
-                if stacks and stacks > 1 then
+                if stacks and stacks > 1 and settings.showStacks then
                     slot.buffText:SetText("x"..stacks)
                     slot.hasStacks = true
                     SetBuffTextStyle(slot, "stacks")
