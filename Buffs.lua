@@ -37,10 +37,10 @@ local function CreateBuffSlot(parent, unitID)
     textFrame:SetFrameLevel(cd:GetFrameLevel() + 2) -- Делаем уровень выше, чем у cd
 
     -- Это стаки заклинаний (Lifebloom у друида)
-    local timerText = textFrame:CreateFontString(nil, "OVERLAY")
-    timerText:SetPoint("CENTER", textFrame, "CENTER", 0, 0)
-    timerText:SetFont(FONT_FILE, FONT_NORMAL_SIZE, "OUTLINE")
-    slot.timerText = timerText
+    local buffText = textFrame:CreateFontString(nil, "OVERLAY")
+    buffText:SetPoint("CENTER", textFrame, "CENTER", 0, 0)
+    buffText:SetFont(FONT_FILE, FONT_NORMAL_SIZE, "OUTLINE")
+    slot.buffText = buffText
 
     slot.isUrgent = false
     slot.hasStacks = false
@@ -64,31 +64,31 @@ local function CreateBuffSlot(parent, unitID)
                         if not self.isUrgent then
                             self.isUrgent = true
                             if s.showTimer then
-                                self.timerText:SetFont(FONT_FILE, FONT_URGENT_SIZE, "OUTLINE")
-                                self.timerText:SetTextColor(1, 0, 0)
+                                self.buffText:SetFont(FONT_FILE, FONT_URGENT_SIZE, "OUTLINE")
+                                self.buffText:SetTextColor(1, 0, 0)
                             end
                         end
                     else
                         if self.isUrgent then
                             self.isUrgent = false
                             if s.showTimer then
-                                self.timerText:SetFont(FONT_FILE, FONT_NORMAL_SIZE, "OUTLINE")
-                                self.timerText:SetTextColor(1, 0.82, 0)
+                                self.buffText:SetFont(FONT_FILE, FONT_NORMAL_SIZE, "OUTLINE")
+                                self.buffText:SetTextColor(1, 0.82, 0)
                             end
                         end
                     end
 
                     -- 2. Рисуем текст ТОЛЬКО если осталось <= 20 секунд
                     if s.showTimer and remain <= 20 then
-                        self.timerText:SetText(currentSec)
+                        self.buffText:SetText(currentSec)
                     else
-                        self.timerText:SetText("")
+                        self.buffText:SetText("")
                     end
                 end
             else
                 self.expirationTime = 0
                 self.isUrgent = false
-                self.timerText:SetText("")
+                self.buffText:SetText("")
                 self.lastSec = -1
             end
         end
@@ -175,12 +175,12 @@ function ns.UpdateBuffs(unitID)
                 slot.buffIndex = i
                 
                 if stacks and stacks > 1 then
-                    slot.timerText:SetText("x"..stacks)
-                    slot.timerText:SetFont(FONT_FILE, FONT_NORMAL_SIZE, "OUTLINE")
-                    slot.timerText:SetTextColor(0.4, 1, 0.4)
+                    slot.buffText:SetText("x"..stacks)
+                    slot.buffText:SetFont(FONT_FILE, FONT_NORMAL_SIZE, "OUTLINE")
+                    slot.buffText:SetTextColor(0.4, 1, 0.4)
                     slot.hasStacks = true
                 else
-                    slot.timerText:SetText("")
+                    slot.buffText:SetText("")
                     slot.hasStacks = false
                 end
 
@@ -198,14 +198,14 @@ function ns.UpdateBuffs(unitID)
                     if remain > URGENT_TIME then
                         slot.isUrgent = false
                         if settings.showTimer and not slot.hasStacks then
-                            slot.timerText:SetFont(FONT_FILE, FONT_NORMAL_SIZE, "OUTLINE")
-                            slot.timerText:SetTextColor(1, 0.82, 0)
+                            slot.buffText:SetFont(FONT_FILE, FONT_NORMAL_SIZE, "OUTLINE")
+                            slot.buffText:SetTextColor(1, 0.82, 0)
                         end
                     end
                 else
                     slot.cd:Hide()
                     slot.expirationTime = 0
-                    slot.timerText:SetText("")
+                    slot.buffText:SetText("")
                 end
 
                 slot:Show()
@@ -234,7 +234,7 @@ function ns.UpdateBuffs(unitID)
         slot:Hide()
         slot.expirationTime = 0
         slot.isUrgent = false
-        slot.timerText:SetText("")
+        slot.buffText:SetText("")
     end
 end
 
