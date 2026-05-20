@@ -600,8 +600,7 @@ initFrame:RegisterEvent("PLAYER_LOGIN")
 initFrame:RegisterEvent("PARTY_MEMBERS_CHANGED")
 initFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 initFrame:RegisterEvent("UNIT_AURA")
-initFrame:RegisterEvent("ACTIONBAR_SHOWGRID")
-initFrame:RegisterEvent("ACTIONBAR_HIDEGRID")
+initFrame:RegisterEvent("CURSOR_UPDATE")
 
 initFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "PLAYER_LOGIN" then
@@ -641,7 +640,7 @@ initFrame:SetScript("OnEvent", function(self, event, arg1)
     elseif event == "SPELL_UPDATE_COOLDOWN" then
         if ns.IsActive() then UpdateCooldowns() end
 
-    elseif event == "ACTIONBAR_SHOWGRID" or event == "ACTIONBAR_HIDEGRID" then
+    elseif event == "CURSOR_UPDATE" then
         if ns.IsActive() then ns.UpdateSlotsVisibility() end
 
     elseif event == "UNIT_AURA" then
