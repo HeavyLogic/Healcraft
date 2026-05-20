@@ -1,6 +1,6 @@
 local addonName, ns = ...
 
--- Создаем кнопку для мини-карты
+-- Create the minimap button
 local minimapButton = CreateFrame("Button", addonName .. "MinimapButton", Minimap)
 minimapButton:SetSize(32, 32)
 
@@ -8,33 +8,33 @@ minimapButton:SetFrameStrata("MEDIUM")
 minimapButton:SetFrameLevel(1)
 minimapButton:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
 
--- ХИТРОСТЬ ДЛЯ SexyMap: 
--- 1. Говорим ему, что мы "сами" управляем движением (он не тронет наши скрипты)
--- 2. При этом он видит кнопку и управляет её видимостью/затуханием
-minimapButton.sexyMapMovable = true 
+-- SexyMap support:
+-- Tell it we manage the movement ourselves
+-- It still sees the button and manages its visibility/fading
+minimapButton.sexyMapMovable = true
 
--- Сама иконка
+-- The icon itself
 local icon = minimapButton:CreateTexture(nil, "BACKGROUND")
 icon:SetSize(20, 20)
 icon:SetPoint("CENTER", minimapButton, "CENTER", 0, 0)
 icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
--- Стандартная близардовская рамка
+-- Standard Blizzard border
 local border = minimapButton:CreateTexture(nil, "OVERLAY")
 border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
 border:SetSize(54, 54)
 border:SetPoint("TOPLEFT", minimapButton, "TOPLEFT", 0, 0)
 
 -- -----------------------------------------------------------------------
--- Логика перетаскивания (С учетом формы карты для SexyMap)
+-- Drag logic (With SexyMap shape awareness)
 -- -----------------------------------------------------------------------
 local function UpdatePosition(angle)
     local cos = math.cos(angle)
     local sin = math.sin(angle)
     
-    -- --- НАСТРОЙКИ ОРБИТЫ ---
-    local radius = 72 -- Попробуй 76, 77 или 78. Чем меньше число, тем ближе к центру.
-    local squareExp = 106 -- Коэффициент выталкивания в углы для квадрата (в Dominos 110)
+    -- --- ORBIT SETTINGS ---
+    local radius = 72 -- Try 76, 77 or 78. Smaller values = closer to the center.
+    local squareExp = 106 -- Corner push-out coefficient for square (110 in Dominos)
     -- ------------------------
 
     local shape = GetMinimapShape and GetMinimapShape() or "ROUND"
@@ -52,12 +52,12 @@ local function UpdatePosition(angle)
 
     local x, y
     if isRound then
-        -- Обычный круг
+        -- Regular circle
         x = cos * radius
         y = sin * radius
     else
-        -- Квадратная математика Dominos, но с твоим радиусом
-        -- Мы ограничиваем (clamp) иконку, чтобы она не улетала за края текстуры
+        -- Dominos square math with your radius
+        -- We clamp the icon so it doesn't fly off the texture edges
         x = math.max(-(radius + 2), math.min(squareExp * cos, radius + 4))
         y = math.max(-(radius + 6), math.min(squareExp * sin, radius + 2))
     end
@@ -90,7 +90,7 @@ minimapButton:SetScript("OnDragStop", function(self)
 end)
 
 -- -----------------------------------------------------------------------
--- Визуальный статус иконки
+-- Icon visual status
 -- -----------------------------------------------------------------------
 function ns.UpdateMinimapIcon()
     if not PartySpellsDB or not PartySpellsDB.settings then return end
@@ -111,26 +111,26 @@ function ns.UpdateMinimapIcon()
 end
 
 -- -----------------------------------------------------------------------
--- Клики и Тултипы (Без изменений)
+-- Clicks and Tooltips
 -- -----------------------------------------------------------------------
 
 local function ShowTooltip(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:AddLine(addonName)
     
-    local statusText = ns.IsActive() and "|cff00ff00Включен|r" or "|cff808080Выключен|r"
-    GameTooltip:AddLine("Статус: " .. statusText)
+    local statusText = ns.IsActive() and "|cff00ff00On|r" or "|cff808080Off|r"
+    GameTooltip:AddLine("Status: " .. statusText)
     
     local lockText = (PartySpellsDB and PartySpellsDB.settings and PartySpellsDB.settings.lockSpells) 
-                     and "|cff00ff00Да|r" 
-                     or "|cff808080Нет|r"
-    GameTooltip:AddLine("Закреплено: " .. lockText)
+                     and "|cff00ff00Yes|r" 
+                     or "|cff808080No|r"
+    GameTooltip:AddLine("Locked: " .. lockText)
     
     GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("Левый клик - вкл/выкл аддон", 1, 1, 1)
-    GameTooltip:AddLine("Правый клик - настройки", 1, 1, 1)
-    GameTooltip:AddLine("Shift + Клик - закрепить заклинания", 1, 1, 1)
-    GameTooltip:AddLine("Перетаскивание - переместить иконку", 0.5, 0.5, 0.5)
+    GameTooltip:AddLine("Left click - toggle addon on/off", 1, 1, 1)
+    GameTooltip:AddLine("Right click - settings", 1, 1, 1)
+    GameTooltip:AddLine("Shift+Click - lock spells", 1, 1, 1)
+    GameTooltip:AddLine("Drag - move icon", 0.5, 0.5, 0.5)
     GameTooltip:Show()
 end
 
@@ -138,7 +138,7 @@ minimapButton:RegisterForClicks("RightButtonUp", "LeftButtonUp")
 minimapButton:SetScript("OnClick", function(self, button)
     if IsShiftKeyDown() then
         if InCombatLockdown() then
-            print("|cffff0000[PartySpells]|r Нельзя менять закрепление заклинаний во время боя!")
+            print("|cffff0000[PartySpells]|r Cannot change spell locking during combat!")
             return
         end
         PartySpellsDB.settings.lockSpells = not PartySpellsDB.settings.lockSpells
@@ -162,13 +162,13 @@ minimapButton:SetScript("OnEnter", function(self) ShowTooltip(self) end)
 minimapButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 -- -----------------------------------------------------------------------
--- Загрузка позиции (Тут поправлен расчет дефолтного угла)
+-- Load position (Default angle calculation fixed here)
 -- -----------------------------------------------------------------------
 local initFrame = CreateFrame("Frame")
 initFrame:RegisterEvent("PLAYER_LOGIN")
 initFrame:SetScript("OnEvent", function()
-    -- Если угла в базе нет, ставим стандартный (радианы)
-    local angle = (PartySpellsDB and PartySpellsDB.minimapAngle) or 3.92 -- 225 градусов
+    -- If no angle in DB, use default (radians)
+    local angle = (PartySpellsDB and PartySpellsDB.minimapAngle) or 3.92 -- 225 degrees
     UpdatePosition(angle)
     ns.UpdateMinimapIcon()
 end)

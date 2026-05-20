@@ -16,9 +16,9 @@ local FRAMES = {
 local rows = {}
 local MAX_SUPPORTED_SLOTS = 5
 
--- Функция, которая переключает режим работы кнопок
+-- Function that switches the button click mode
 function ns.UpdateCastingBehavior()
-    -- Проверяем: загружена ли база. Если нет - по умолчанию false (разрешено таскать)
+    -- Check if DB is loaded. If not - default false (allowed to drag)
     local isLocked = false
     if PartySpellsDB and PartySpellsDB.settings and type(PartySpellsDB.settings.lockSpells) == "boolean" then
         isLocked = PartySpellsDB.settings.lockSpells
@@ -42,10 +42,10 @@ end
 -- Cooldowns update
 -- -----------------------------------------------------------------------
 local function UpdateCooldowns()
-    -- Проходим по всем созданным строкам
+    -- Iterate over all created rows
     local s = PartySpellsDB.settings
     for unitID, row in pairs(rows) do
-        -- Обновляем кулдауны только если фрейм игрока сейчас отображается
+        -- Update cooldowns only if the player frame is currently visible
         if row.frame:IsVisible() then
             for i = 1, s.slotsCount do
                 local slot = row.slots[i]
@@ -61,9 +61,9 @@ local function UpdateCooldowns()
 end
 
 -- -----------------------------------------------------------------------
--- Range Check (Оптимизированный таймер)
+-- Range Check (Optimized timer)
 -- -----------------------------------------------------------------------
-local RANGE_CHECK_INTERVAL = 0.2 -- Проверяем 5 раз в секунду
+local RANGE_CHECK_INTERVAL = 0.2 -- Check 5 times per second
 local rangeTimer = 0
 
 local rangeFrame = CreateFrame("Frame")
@@ -72,26 +72,26 @@ rangeFrame:SetScript("OnUpdate", function(self, elapsed)
 
     rangeTimer = rangeTimer + elapsed
 
-    -- Как только набралось 0.2 сек, делаем проверку
+    -- Once 0.2 sec has passed, do the check
     if rangeTimer >= RANGE_CHECK_INTERVAL then
         rangeTimer = 0
         local s = PartySpellsDB.settings
         
-        -- Проходим только по существующим строкам
+        -- Iterate only over existing rows
         for unitID, row in pairs(rows) do
-            -- Проверяем только если строка видима (член группы существует)
+            -- Check only if the row is visible (party member exists)
             if row.frame:IsVisible() then
                 for i = 1, s.slotsCount do
                     local slot = row.slots[i]
                     if slot.spellName then
-                        -- IsSpellInRange нативно понимает строковое имя спелла в 3.3.5
+                        -- IsSpellInRange natively understands string spell names in 3.3.5
                         local inRange = IsSpellInRange(slot.spellName, slot.unitID)
                         
-                        -- Если вернулся 0, значит спелл точно не достает до цели
+                        -- If 0 is returned, the spell definitely doesn't reach the target
                         if inRange == 0 then
                             slot.outOfRange:Show()
                         else
-                            -- Во всех остальных случаях (в зоне или цель невалидна) - скрываем
+                            -- In all other cases (in range or invalid target) - hide
                             slot.outOfRange:Hide()
                         end
                     end
@@ -161,7 +161,7 @@ local function FillSlot(slot, spellName, texture)
     slot:SetAttribute("spell", spellName)
     slot:SetAttribute("unit", slot.unitID)
     
-    -- Обновляем кулдауны, чтобы только что брошенный спелл показал правильный таймер
+    -- Update cooldowns so a freshly cast spell shows the correct timer
     UpdateCooldowns()
     ns.UpdateSlotsVisibility()
 end
@@ -173,7 +173,7 @@ local function ClearSlot(slot)
     if slot.outOfRange then slot.outOfRange:Hide() end
     SaveSlot(slot.unitID, slot.slotIndex, nil)
 
-    -- Очищаем атрибуты (только вне боя, в бою это запрещено ядром игры)
+    -- Clear attributes (only outside combat, it's forbidden by the game core during combat)
     if not InCombatLockdown() then
         slot:SetAttribute("type", nil)
         slot:SetAttribute("spell", nil)
@@ -209,15 +209,15 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     slot.icon = icon
 
     local cd = CreateFrame("Cooldown", nil, slot, "CooldownFrameTemplate")
-    cd:SetAllPoints(icon) -- Кулдаун будет покрывать только саму иконку
-    cd:SetReverse(false)  -- Обычное затемнение
+    cd:SetAllPoints(icon) -- Cooldown will cover only the icon itself
+    cd:SetReverse(false)  -- Normal darkening
     slot.cd = cd
 
     local outOfRange = slot:CreateTexture(nil, "OVERLAY")
-    outOfRange:SetAllPoints(icon) -- Слой накладывается поверх самой иконки
-    -- Задаем цвет: Красный (R=1, G=0, B=0) с прозрачностью 60% (Alpha=0.6)
+    outOfRange:SetAllPoints(icon) -- Layer overlays the icon itself
+    -- Set color: Red (R=1, G=0, B=0) with 60% transparency (Alpha=0.6)
     outOfRange:SetTexture(1, 0, 0, 0.6) 
-    outOfRange:Hide() -- Скрыт по умолчанию
+    outOfRange:Hide() -- Hidden by default
     slot.outOfRange = outOfRange
 
     local flash = slot:CreateTexture(nil, "OVERLAY")
@@ -241,15 +241,15 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
             elseif s.flashMode == 2 then
                 flash:SetAlpha(1)
             elseif s.flashMode == 3 then
-                -- 1. Плавное появление и затухание (Синусоида: 0 -> 1 -> 0)
+                -- 1. Smooth fade in and out (Sine wave: 0 -> 1 -> 0)
                 flash:SetAlpha(math.sin(progress * math.pi))
                 
-                -- 2. Вращение текстуры по часовой стрелке
-                -- Вращаем на 90 градусов (math.pi / 2) за время анимации
+                -- 2. Rotate the texture clockwise
+                -- Rotate 90 degrees (math.pi / 2) over the animation duration
                 local angle = progress * (math.pi / 2)
                 local cosA, sinA = math.cos(angle), math.sin(angle)
                 
-                -- Матрица поворота текстурных координат вокруг центра (0.5, 0.5)
+                -- Texture coordinate rotation matrix around center (0.5, 0.5)
                 local ULx, ULy = 0.5 - 0.5*cosA + 0.5*sinA, 0.5 - 0.5*sinA - 0.5*cosA
                 local LLx, LLy = 0.5 - 0.5*cosA - 0.5*sinA, 0.5 - 0.5*sinA + 0.5*cosA
                 local URx, URy = 0.5 + 0.5*cosA + 0.5*sinA, 0.5 + 0.5*sinA - 0.5*cosA
@@ -265,7 +265,7 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
         if not s.flashMode or s.flashMode == 0 then return end 
 
         flash:ClearAllPoints()
-        flash:SetTexCoord(0, 1, 0, 1) -- Обязательно сбрасываем координаты в дефолт
+        flash:SetTexCoord(0, 1, 0, 1) -- Always reset coords to default
         
         if s.flashMode == 1 then
             flash:SetAllPoints(slot.icon)
@@ -277,12 +277,12 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
             flash:SetVertexColor(0, 1, 0, 1)
         elseif s.flashMode == 3 then
             flash:SetPoint("CENTER", slot, "CENTER", 0, 0)
-            flash:SetSize(s.slotSize * 1.25, s.slotSize * 1.25) -- Меньше в 2 раза
+            flash:SetSize(s.slotSize * 1.25, s.slotSize * 1.25) -- 2x smaller
             flash:SetTexture("Interface\\Cooldown\\star4")
-            flash:SetVertexColor(1, 1, 1, 1) -- Белый цвет
+            flash:SetVertexColor(1, 1, 1, 1) -- White color
         end
         
-        -- Для режима 3 альфа стартует с 0, чтобы появиться плавно
+        -- For mode 3 alpha starts at 0 to fade in smoothly
         flash:SetAlpha(s.flashMode == 3 and 0 or 1)
         flash:Show()
         fader.elapsed = 0
@@ -293,7 +293,7 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     hl:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
     hl:SetAllPoints(slot)
     hl:SetBlendMode("ADD")
-    slot.hl = hl -- Сохраняем, чтобы обращаться к ней позже!
+    slot.hl = hl -- Keep reference for later use!
 
     slot:EnableMouse(true)
     slot:RegisterForDrag("LeftButton")
@@ -331,15 +331,15 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
         local name, _, texture = GetSpellInfo(id, subType)
     
         if name and texture then
-            -- Запоминаем старый спелл (если он был)
+            -- Remember the old spell (if any)
             local oldName = self.spellName
     
-            -- Заполняем слот (FillSlot сам обновит атрибуты на type="spell")
+            -- Fill the slot (FillSlot will update attributes to type="spell")
             FillSlot(self, name, texture)
             SaveSlot(self.unitID, self.slotIndex, name)
-            ClearCursor() -- На всякий случай очищаем курсор
+            ClearCursor() -- Clear cursor just in case
     
-            -- Если в слоте уже был спелл, берем его на курсор
+            -- If there was already a spell in the slot, pick it up on the cursor
             if oldName then
                 PickupSpell(oldName)
             end
@@ -362,18 +362,18 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     slot:SetScript("OnReceiveDrag", TryReceiveSpell)
 
     slot:SetScript("PreClick", function(self, button)
-        -- Обрабатываем дроп только левой кнопкой мыши
+        -- Handle drop only with left mouse button
         if button ~= "LeftButton" then return end
         
         local infoType, id, subType = GetCursorInfo()
         if infoType == "spell" then
             self.isDropping = true
-            -- Сохраняем данные заклинания до того, как клиент успеет очистить курсор
+            -- Save spell data before the client clears the cursor
             self.dropID = id
             self.dropSubType = subType
             
             if not InCombatLockdown() then
-                -- Временно удаляем type, чтобы SecureActionButton не скастовал спелл на этом же клике
+                -- Temporarily remove type so SecureActionButton doesn't cast the spell on this click
                 self.oldType = self:GetAttribute("type")
                 self:SetAttribute("type", nil)
             end
@@ -388,10 +388,10 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
         if self.isDropping then
             self.isDropping = false
             if not InCombatLockdown() then
-                -- Вызываем нашу функцию обмена
+                -- Call our swap function
                 local success = HandleReceiveSpell(self, self.dropID, self.dropSubType)
                 
-                -- Если что-то пошло не так (вернулся false), восстанавливаем старый атрибут
+                -- If something went wrong (returned false), restore the old attribute
                 if not success and self.oldType then
                     self:SetAttribute("type", self.oldType)
                 end
@@ -418,7 +418,7 @@ local function CreateRow(unitID, anchor)
     if rows[unitID] then return end
 
     local row = CreateFrame("Frame", ADDON_NAME .. "Row_" .. unitID, anchor) 
-    -- Размеры зададутся позже в ns.RefreshLayout
+    -- Dimensions will be set later in ns.RefreshLayout
     local slots = {}
     for i = 1, MAX_SUPPORTED_SLOTS do
         local slot = CreateSpellSlot(row, unitID, i)
@@ -452,16 +452,16 @@ end
 
 local function RefreshRows()
     local groupSize = GetNumPartyMembers()
-    local isActive = ns.IsActive() -- Проверяем мастер-свитч
+    local isActive = ns.IsActive() -- Check master switch
 
     for i = 1, 4 do
         local unitID = "party" .. i
         if rows[unitID] then
-            -- Если аддон включен И игрок есть в группе
+            -- If addon is on AND player is in a group
             if isActive and i <= groupSize then
                 rows[unitID].frame:Show()
             else
-                -- Иначе прячем все слоты
+                -- Otherwise hide all slots
                 rows[unitID].frame:Hide()
             end
         end
@@ -479,9 +479,9 @@ function ns.RefreshAllVisibility()
 end
 
 -- -----------------------------------------------------------------------
--- API для других модулей аддона
+-- API for other addon modules
 -- -----------------------------------------------------------------------
--- Функция для вызова вспышки из других файлов
+-- Function to trigger flash from other files
 function ns.FlashSpellSlot(unitID, spellName)
     if rows[unitID] then
         local s = PartySpellsDB.settings
@@ -518,16 +518,16 @@ function ns.UpdateSlotsVisibility()
         for i = 1, s.slotsCount do
             local slot = row.slots[i]
             if slot.spellName or isDraggingSpell then
-                -- Показываем слот
+                -- Show the slot
                 slot:SetBackdropColor(0, 0, 0, 0.85)
                 slot:SetBackdropBorderColor(0.35, 0.35, 0.35, 1)
-                -- Возвращаем синюю подсветку при наведении
+                -- Restore blue highlight on hover
                 if slot.hl then slot.hl:SetAlpha(1) end 
             else
-                -- Делаем слот невидимым
+                -- Make the slot invisible
                 slot:SetBackdropColor(0, 0, 0, 0)
                 slot:SetBackdropBorderColor(0, 0, 0, 0)
-                -- Отключаем свечение при наведении (прячем слой)
+                -- Disable hover glow (hide the layer)
                 if slot.hl then slot.hl:SetAlpha(0) end 
             end
         end
@@ -536,7 +536,7 @@ end
 
 function ns.RefreshLayout()
     if not PartySpellsDB or not PartySpellsDB.settings then return end
-    -- Если мы в бою, менять позиции нельзя (из-за Secure кнопок внутри)
+    -- Cannot change positions during combat (due to Secure buttons inside)
     if InCombatLockdown() then return end 
 
     local s = PartySpellsDB.settings
@@ -548,13 +548,13 @@ function ns.RefreshLayout()
             rowData.frame:SetSize(totalWidth, s.slotSize)
             
             rowData.frame:ClearAllPoints()
-            -- Привязываем LEFT нашего фрейма к RIGHT якоря (PartyMemberFrame)
-            -- Используем числа напрямую. 
+            -- Attach LEFT of our frame to RIGHT of the anchor (PartyMemberFrame)
+            -- Use numbers directly.
             rowData.frame:SetPoint("LEFT", anchor, "RIGHT", tonumber(s.offsetX) or 0, tonumber(s.offsetY) or 0)
             
             rowData.frame:SetAlpha(s.alphaButtons / 100)
 
-            -- Обновляем размеры и положение самих слотов
+            -- Update dimensions and position of the slots themselves
             for i = 1, MAX_SUPPORTED_SLOTS do
                 local slot = rowData.slots[i]
                 if i <= s.slotsCount then
@@ -588,10 +588,10 @@ initFrame:RegisterEvent("CURSOR_UPDATE")
 
 initFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "PLAYER_LOGIN" then
-        -- 1. Сначала загружаем базу и настройки
+        -- 1. First load the database and settings
         ns.InitDB()
 
-        -- 2. Затем создаем UI
+        -- 2. Then create UI
         for _, unitID in ipairs(UNITS) do
             local anchor = FRAMES[unitID]
             if anchor then
@@ -604,7 +604,7 @@ initFrame:SetScript("OnEvent", function(self, event, arg1)
         ns.RefreshLayout()
         ns.RefreshAllVisibility()
         
-        -- Устанавливаем правильный режим кнопок при загрузке
+        -- Set the correct button mode on load
         ns.UpdateCastingBehavior()
 
         if SpellBookFrame then
@@ -628,8 +628,8 @@ initFrame:SetScript("OnEvent", function(self, event, arg1)
         if ns.IsActive() then ns.UpdateSlotsVisibility() end
 
     elseif event == "UNIT_AURA" then
-        -- Вызываем функцию обновления баффов
-        -- Она сама внутри проверит, относится ли этот arg1 к нашей группе
+        -- Call the buff update function
+        -- It internally checks if this arg1 belongs to our group
         if ns.IsActive() then ns.UpdateBuffs(arg1) end
     end
 end)

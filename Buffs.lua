@@ -1,16 +1,16 @@
 local addonName, ns = ...
 
-local BUFF_SIZE = 16 -- на 19 появляется встроенный таймер
+local BUFF_SIZE = 16 -- at 19, built-in timer appears
 local BUFF_GAP  = 3
 local BUFF_OFFSET_Y = -1
 local URGENT_TIME = 5
-local MAX_SUPPORTED_SLOTS = 5 -- Резервируем максимум слотов
+local MAX_SUPPORTED_SLOTS = 5 -- Reserve maximum slots
 
 local GetTime = GetTime
 local ceil = math.ceil
 
--- Настройки шрифта
-local FONT_FILE = "Fonts\\FRIZQT__.TTF" -- Стандартный шрифт интерфейса WoW
+-- Font settings
+local FONT_FILE = "Fonts\\FRIZQT__.TTF" -- Standard WoW interface font
 local FONT_NORMAL_SIZE = 10
 local FONT_URGENT_SIZE = 13
 
@@ -103,7 +103,7 @@ local function CreateBuffSlot(parent, unitID)
 
     local icon = slot:CreateTexture(nil, "ARTWORK")
     icon:SetAllPoints()
-    -- Немного подрезаем края, чтобы убрать стандартную серую рамку иконок 3.3.5
+    -- Slightly trim edges to remove the default gray border of 3.3.5 icons
     icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
     slot.icon = icon
 
@@ -113,19 +113,19 @@ local function CreateBuffSlot(parent, unitID)
     cd:SetDrawEdge(true)
     slot.cd = cd
 
-    -- Создаем отдельный фрейм для текстов, чтобы поднять его НАД тенью кулдауна
+    -- Create a separate frame for texts to raise it ABOVE the cooldown shadow
     local textFrame = CreateFrame("Frame", nil, slot)
     textFrame:SetAllPoints()
-    textFrame:SetFrameLevel(cd:GetFrameLevel() + 2) -- Делаем уровень выше, чем у cd
+    textFrame:SetFrameLevel(cd:GetFrameLevel() + 2) -- Set higher frame level than cd
 
-    -- Текст для таймера и для стеков заклинаний
+    -- Text for timer and spell stacks
     local buffText = textFrame:CreateFontString(nil, "OVERLAY")
     buffText:SetPoint("CENTER", textFrame, "CENTER", 0, 0)
     slot.buffText = buffText
     SetBuffTextStyle(slot, "normal")
 
     slot.hasStacks = false
-    slot.lastSec = -1 -- Для оптимизации OnUpdate
+    slot.lastSec = -1 -- For OnUpdate optimization
 
     slot:EnableMouse(true)
     slot:SetScript("OnEnter", function(self)
@@ -150,11 +150,11 @@ function ns.CreateBuffRow(unitID)
     local manaBar = _G["PartyMemberFrame" .. memberIndex .. "ManaBar"]
     if not manaBar then return end
 
-    -- Прикрепляем к мана-бару напрямую
+    -- Attach directly to the mana bar
     local row = CreateFrame("Frame", addonName .. "BuffRow_" .. unitID, manaBar:GetParent())
     row:SetSize((BUFF_SIZE + BUFF_GAP) * MAX_SUPPORTED_SLOTS, BUFF_SIZE)
     row:SetPoint("TOPLEFT", manaBar, "BOTTOMLEFT", 0, BUFF_OFFSET_Y)
-    -- Поднимаем уровень, чтобы не перекрывалось стандартными фреймами
+    -- Raise level to avoid being overlapped by default frames
     row:SetFrameLevel(manaBar:GetParent():GetFrameLevel() + 5)
 
     local slots = {}
@@ -194,7 +194,7 @@ function ns.UpdateBuffs(unitID)
     local currentBuffs = {}
     local displayIndex = 1
 
-    -- Используем цикл до 40 (макс. баффов в 3.3.5)
+    -- Loop up to 40 (max buffs in 3.3.5)
     for i = 1, 40 do
         local name, _, icon, stacks, _, duration, expirationTime, unitCaster = UnitBuff(unitID, i)
         if not name then break end
@@ -225,15 +225,15 @@ function ns.UpdateBuffs(unitID)
                         slot:SetScript("OnUpdate", nil)
                     end
 
-                    -- Обновляем кулдаун только если изменилось время истечения
+                    -- Update cooldown only if expiration time changed
                     if slot.expirationTime ~= expirationTime then
                         local start = expirationTime - duration
                         CooldownFrame_SetTimer(slot.cd, start, duration, 1)
                         slot.expirationTime = expirationTime
-                        slot.lastSec = -1 -- Сброс таймера для OnUpdate
+                        slot.lastSec = -1 -- Reset timer for OnUpdate
                     end
                     
-                    -- ИСПРАВЛЕНИЕ: Сбрасываем красный цвет при обновлении баффа
+                    -- Reset red color on buff refresh
                     local remain = expirationTime - GetTime()
                     if remain > URGENT_TIME then
                         if settings.showTimer and not slot.hasStacks then
@@ -267,7 +267,7 @@ function ns.UpdateBuffs(unitID)
 
     previousBuffs[unitID] = currentBuffs
 
-    -- Скрываем неиспользованные слоты
+    -- Hide unused slots
     for i = displayIndex, MAX_SUPPORTED_SLOTS do
         local slot = rowData.slots[i]
         slot:Hide()
