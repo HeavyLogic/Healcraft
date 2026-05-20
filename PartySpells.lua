@@ -204,7 +204,7 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     local icon = slot:CreateTexture(nil, "ARTWORK")
     icon:SetPoint("TOPLEFT",     slot, "TOPLEFT",      4, -4)
     icon:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -4,  4)
-    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
     icon:Hide()
     slot.icon = icon
 
@@ -299,6 +299,8 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     slot:RegisterForDrag("LeftButton")
 
     slot:SetScript("OnEnter", function(self)
+        if not PartySpellsDB.settings.showTooltips then return end
+        
         if self.spellName then
             local texture = GetTextureByName(self.spellName)
             if texture then

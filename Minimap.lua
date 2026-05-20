@@ -143,7 +143,7 @@ minimapButton:SetScript("OnClick", function(self, button)
         end
         PartySpellsDB.settings.lockSpells = not PartySpellsDB.settings.lockSpells
         if ns.UpdateCastingBehavior then ns.UpdateCastingBehavior() end
-        local cb = _G[addonName .. "LockSpellsCheckbox"]
+        local cb = _G[addonName .. "lockSpellsCheckButton"]
         if cb then cb:SetChecked(PartySpellsDB.settings.lockSpells) end
         ns.UpdateMinimapIcon()
         if GameTooltip:IsOwned(self) then ShowTooltip(self) end
