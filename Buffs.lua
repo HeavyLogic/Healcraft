@@ -36,16 +36,21 @@ local function CreateBuffSlot(parent, unitID)
     textFrame:SetAllPoints()
     textFrame:SetFrameLevel(cd:GetFrameLevel() + 2) -- Делаем уровень выше, чем у cd
 
-    -- Стаки и таймер
-    local text = textFrame:CreateFontString(nil, "OVERLAY")
-    text:SetPoint("CENTER", textFrame, "CENTER", 0, 0)
-    text:SetFont(FONT_FILE, FONT_NORMAL_SIZE, "OUTLINE")
-    slot.text = text
+    -- Это стаки заклинаний (Lifebloom у друида)
+    local timerText = textFrame:CreateFontString(nil, "OVERLAY")
+    timerText:SetPoint("CENTER", textFrame, "CENTER", 0, 0)
+    timerText:SetFont(FONT_FILE, FONT_NORMAL_SIZE, "OUTLINE")
+    slot.timerText = timerText
 
     slot.isUrgent = false
+    slot.hasStacks = false
     slot.lastSec = -1 -- Для оптимизации OnUpdate
 
     slot:SetScript("OnUpdate", function(self)
+        if self.hasStacks then
+            return
+        end
+
         if self.expirationTime and self.expirationTime > 0 then
             local remain = self.expirationTime - GetTime()
             if remain > 0 then
@@ -158,7 +163,7 @@ function ns.UpdateBuffs(unitID)
 
     -- Используем цикл до 40 (макс. баффов в 3.3.5)
     for i = 1, 40 do
-        local name, _, icon, count, _, duration, expirationTime, unitCaster = UnitBuff(unitID, i)
+        local name, _, icon, stacks, _, duration, expirationTime, unitCaster = UnitBuff(unitID, i)
         if not name then break end
 
         if activeSpells[name] and unitCaster == "player" then
@@ -169,34 +174,38 @@ function ns.UpdateBuffs(unitID)
                 slot.icon:SetTexture(icon)
                 slot.buffIndex = i
                 
-                if count and count > 1 then
-                    slot.countText:SetText("x"+count)
+                if stacks and stacks > 1 then
+                    slot.timerText:SetText("x"..stacks)
+                    slot.timerText:SetFont(FONT_FILE, FONT_NORMAL_SIZE, "OUTLINE")
+                    slot.timerText:SetTextColor(0.4, 1, 0.4)
+                    slot.hasStacks = true
                 else
-                    slot.countText:SetText("")
+                    slot.timerText:SetText("")
+                    slot.hasStacks = false
+                end
 
-                    if duration and duration > 0 and expirationTime then
-                        -- Обновляем кулдаун только если изменилось время истечения
-                        if slot.expirationTime ~= expirationTime then
-                            local start = expirationTime - duration
-                            CooldownFrame_SetTimer(slot.cd, start, duration, 1)
-                            slot.expirationTime = expirationTime
-                            slot.lastSec = -1 -- Сброс таймера для OnUpdate
-                        end
-                        
-                        -- ИСПРАВЛЕНИЕ: Сбрасываем красный цвет при обновлении баффа
-                        local remain = expirationTime - GetTime()
-                        if remain > URGENT_TIME then
-                            slot.isUrgent = false
-                            if settings.showTimer then
-                                slot.timerText:SetFont(FONT_FILE, FONT_NORMAL_SIZE, "OUTLINE")
-                                slot.timerText:SetTextColor(1, 0.82, 0)
-                            end
-                        end
-                    else
-                        slot.cd:Hide()
-                        slot.expirationTime = 0
-                        slot.timerText:SetText("")
+                if duration and duration > 0 and expirationTime then
+                    -- Обновляем кулдаун только если изменилось время истечения
+                    if slot.expirationTime ~= expirationTime then
+                        local start = expirationTime - duration
+                        CooldownFrame_SetTimer(slot.cd, start, duration, 1)
+                        slot.expirationTime = expirationTime
+                        slot.lastSec = -1 -- Сброс таймера для OnUpdate
                     end
+                    
+                    -- ИСПРАВЛЕНИЕ: Сбрасываем красный цвет при обновлении баффа
+                    local remain = expirationTime - GetTime()
+                    if remain > URGENT_TIME then
+                        slot.isUrgent = false
+                        if settings.showTimer and not slot.hasStacks then
+                            slot.timerText:SetFont(FONT_FILE, FONT_NORMAL_SIZE, "OUTLINE")
+                            slot.timerText:SetTextColor(1, 0.82, 0)
+                        end
+                    end
+                else
+                    slot.cd:Hide()
+                    slot.expirationTime = 0
+                    slot.timerText:SetText("")
                 end
 
                 slot:Show()
