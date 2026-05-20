@@ -22,6 +22,7 @@ function ns.InitDB()
         buffsActive = true,
         showTimer   = true,
         alphaBuffs  = 80,
+        showStacks  = true,
         showTooltips = false,
         showTooltipsBuffs = false,
     }
@@ -40,6 +41,8 @@ local FLASH_OPTIONS = {
 }
 
 local FLASH_TEXTS = {}
+local CHECKBOXES = {}
+local SLIDERS = {}
 
 for _, opt in ipairs(FLASH_OPTIONS) do
     FLASH_TEXTS[opt.value] = opt.text
@@ -97,9 +100,12 @@ local function RefreshVisuals(panelName)
     end
 end
 
+local alignFrom = nil
+
 -- Шаблон создания слайдера
-local function CreateSlider(panel, text, minVal, maxVal, step, dbKey, alignFrom, x, y)
+local function CreateSlider(panel, text, minVal, maxVal, step, dbKey, x, y)
     local slider = CreateFrame("Slider", addonName..dbKey.."Slider", panel, "OptionsSliderTemplate")
+    SLIDERS[dbKey] = slider;
     slider:SetPoint("TOPLEFT", alignFrom, "BOTTOMLEFT", x, y)
     slider:SetMinMaxValues(minVal, maxVal)
     slider:SetValueStep(step)
@@ -115,8 +121,9 @@ local function CreateSlider(panel, text, minVal, maxVal, step, dbKey, alignFrom,
     return slider
 end
 
-local function CreateCheckbox(panel, text, dbKey, alignFrom, x, y, callback)
+local function CreateCheckbox(panel, text, dbKey, x, y, callback)
     local checkbox = CreateFrame("CheckButton", addonName .. dbKey.."CheckButton", panel, "InterfaceOptionsCheckButtonTemplate")
+    CHECKBOXES[dbKey] = checkbox;
     checkbox:SetPoint("TOPLEFT", alignFrom, "BOTTOMLEFT", x, y)
     _G[checkbox:GetName() .. "Text"]:SetText(" " .. text)
 
@@ -134,9 +141,9 @@ end
 -- -----------------------------------------------------------------------
 -- Наполнение вкладки General
 -- -----------------------------------------------------------------------
-local title = generalPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-title:SetPoint("TOPLEFT", 16, -16)
-title:SetText("PartySpells: General")
+alignFrom = generalPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+alignFrom:SetPoint("TOPLEFT", 16, -16)
+alignFrom:SetText("PartySpells: General")
 
 local gapYTitles = -16;
 local gapYSliders = -32;
@@ -146,25 +153,29 @@ local dropdownsOffset = 10;
 local addYGap = 7;
 
 -- Master switch
-local activeCb = CreateCheckbox(generalPanel, "Включить аддон (Master Switch)", "isActive", title, 0, gapYTitles, function(self)
+local activeCb = CreateCheckbox(generalPanel, "Включить аддон (Master Switch)", "isActive", 0, gapYTitles, function(self)
     ns.SetActive(self:GetChecked() ~= nil)
     print(self:GetName())
 end)
 
 -- === Левая колонка слайдеров ===
-local slotsSlider    = CreateSlider(generalPanel, "Кол-во слотов", 1, 5, 1, "slotsCount", activeCb, slidersOffset, gapYSliders+addYGap)
-local offsetXSlider   = CreateSlider(generalPanel, "Смещение по X", -12, 30, 1, "offsetX", slotsSlider, 0, gapYSliders)
-local gapSlider      = CreateSlider(generalPanel, "Отступ между слотами", -4, 30, 1, "slotGap", offsetXSlider, 0, gapYSliders)
+alignFrom = activeCb
+alignFrom = CreateSlider(generalPanel, "Кол-во слотов", 1, 5, 1, "slotsCount", slidersOffset, gapYSliders+addYGap)
+alignFrom = CreateSlider(generalPanel, "Смещение по X", -12, 30, 1, "offsetX", 0, gapYSliders)
+alignFrom = CreateSlider(generalPanel, "Отступ между слотами", -4, 30, 1, "slotGap", 0, gapYSliders)
+
+local lastLeftItem = alignFrom;
 
 -- === Правая колонка слайдеров ===
-local sizeSlider     = CreateSlider(generalPanel, "Размер слота", 18, 75, 1, "slotSize", activeCb, 200, gapYSliders+addYGap)
-local offsetYSlider   = CreateSlider(generalPanel, "Смещение по Y", -20, 30, 1, "offsetY", sizeSlider, 0, gapYSliders)
-local btnAlphaSlider   = CreateSlider(generalPanel, "Прозрачность", 10, 100, 5, "alphaButtons", offsetYSlider, 0, gapYSliders)
+alignFrom = activeCb
+alignFrom = CreateSlider(generalPanel, "Размер слота", 18, 75, 1, "slotSize", 200, gapYSliders+addYGap)
+alignFrom = CreateSlider(generalPanel, "Смещение по Y", -20, 30, 1, "offsetY", 0, gapYSliders)
+alignFrom = CreateSlider(generalPanel, "Прозрачность", 10, 100, 5, "alphaButtons", 0, gapYSliders)
 
 -- === Под колонками ===
 -- Режим вспышки слота
 local flashDD = CreateFrame("Frame", addonName.."FlashDropdown", generalPanel, "UIDropDownMenuTemplate")
-flashDD:SetPoint("TOPLEFT", gapSlider, "BOTTOMLEFT", 0-slidersOffset-dropdownsOffset, gapYSliders-addYGap)
+flashDD:SetPoint("TOPLEFT", lastLeftItem, "BOTTOMLEFT", 0-slidersOffset-dropdownsOffset, gapYSliders-addYGap)
 local flashLabel = flashDD:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 flashLabel:SetPoint("BOTTOMLEFT", flashDD, "TOPLEFT", 16, 3)
 flashLabel:SetText("Режим вспышки слота:")
@@ -187,7 +198,8 @@ end
 UIDropDownMenu_Initialize(flashDD, InitFlashDropdown)
 
 -- Закрепить заклинания
-local lockSpellsCb = CreateCheckbox(generalPanel, "Lock spells (Insta-cast, no Drag&Drop)", "lockSpells", flashDD, dropdownsOffset, gapYCheckboxes-addYGap, function(self)
+alignFrom = flashDD
+alignFrom = CreateCheckbox(generalPanel, "Lock spells (Insta-cast, no Drag&Drop)", "lockSpells", dropdownsOffset, gapYCheckboxes-addYGap, function(self)
     if InCombatLockdown() then
         print("|cffff0000[PartySpells]|r Нельзя менять эту настройку прямо во время боя!")
         self:SetChecked(PartySpellsDB.settings.lockSpells)
@@ -202,15 +214,14 @@ end)
 -- -----------------------------------------------------------------------
 -- Настройки баффов
 -- -----------------------------------------------------------------------
-local buffsTitle = buffsPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-buffsTitle:SetPoint("TOPLEFT", 16, -16)
-buffsTitle:SetText("PartySpells: Buffs")
+alignFrom = buffsPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+alignFrom:SetPoint("TOPLEFT", 16, -16)
+alignFrom:SetText("PartySpells: Buffs")
 
-local buffsActiveCb = CreateCheckbox(buffsPanel, "Включить отображение баффов", "buffsActive", buffsTitle, 0, gapYTitles)
-local showTimerCb = CreateCheckbox(buffsPanel, "Показывать таймер на иконке", "showTimer", buffsActiveCb, 0, gapYCheckboxes)
-
--- Прозрачность баффов
-local buffAlphaSlider  = CreateSlider(buffsPanel, "Прозрачность", 10, 100, 5, "alphaBuffs", showTimerCb, slidersOffset, gapYSliders+addYGap)
+alignFrom = CreateCheckbox(buffsPanel, "Включить отображение баффов", "buffsActive", 0, gapYTitles)
+alignFrom = CreateCheckbox(buffsPanel, "Показывать таймер на иконке", "showTimer", 0, gapYCheckboxes)
+alignFrom = CreateCheckbox(buffsPanel, "Показывать стаки заклинаний", "showStacks", 0, gapYCheckboxes)
+alignFrom = CreateSlider(buffsPanel, "Прозрачность", 10, 100, 5, "alphaBuffs", slidersOffset, gapYSliders+addYGap)
 
 -- -----------------------------------------------------------------------
 -- Синхронизация UI с базой при загрузке
@@ -219,26 +230,19 @@ local initFrame = CreateFrame("Frame")
 initFrame:RegisterEvent("PLAYER_LOGIN")
 initFrame:SetScript("OnEvent", function()
     ns.InitDB()
-    activeCb:SetChecked(ns.IsActive())
-    
     local s = PartySpellsDB.settings
-    slotsSlider:SetValue(s.slotsCount)
-    sizeSlider:SetValue(s.slotSize)
-    gapSlider:SetValue(s.slotGap)
-    
-    offsetXSlider:SetValue(s.offsetX)
-    offsetYSlider:SetValue(s.offsetY)
+
+    for dbKey, slider in pairs(SLIDERS) do
+        slider:SetValue(s[dbKey])
+    end
+
+    for dbKey, checkbox in pairs(CHECKBOXES) do
+        checkbox:SetChecked(s[dbKey])
+    end
     
     UIDropDownMenu_SetSelectedValue(flashDD, s.flashMode)
     UIDropDownMenu_SetText(
         flashDD,
         FLASH_TEXTS[s.flashMode] or FLASH_TEXTS[defs.flashMode]
     )
-
-    btnAlphaSlider:SetValue(s.alphaButtons)
-    buffAlphaSlider:SetValue(s.alphaBuffs)
-    
-    lockSpellsCb:SetChecked(s.lockSpells)
-    buffsActiveCb:SetChecked(s.buffsActive)
-    showTimerCb:SetChecked(s.showTimer)
 end)
