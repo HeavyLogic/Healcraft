@@ -199,7 +199,7 @@ function ns.UpdateBuffs(unitID)
         local name, _, icon, stacks, _, duration, expirationTime, unitCaster = UnitBuff(unitID, i)
         if not name then break end
 
-        stacks = 9
+        -- stacks = 9 --debug
 
         if activeSpells[name] and unitCaster == "player" then
             currentBuffs[name] = true

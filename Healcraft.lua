@@ -350,6 +350,11 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     end
     
     local function TryReceiveSpell(self)
+        -- Block adding if locked or in combat
+        if InCombatLockdown() or HealcraftDB.settings.lockSpells then
+            return false
+        end
+
         local infoType, id, subType = GetCursorInfo()
         if infoType == "spell" then
             return HandleReceiveSpell(self, id, subType)
@@ -359,12 +364,16 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
 
     slot:SetScript("OnReceiveDrag", TryReceiveSpell)
 
-    slot:SetScript("OnReceiveDrag", TryReceiveSpell)
-
     slot:SetScript("PreClick", function(self, button)
         -- Handle drop only with left mouse button
         if button ~= "LeftButton" then return end
         
+        -- Block click-to-drop if locked or in combat
+        if InCombatLockdown() or HealcraftDB.settings.lockSpells then
+            self.isDropping = false
+            return
+        end
+
         local infoType, id, subType = GetCursorInfo()
         if infoType == "spell" then
             self.isDropping = true
@@ -387,7 +396,7 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
         
         if self.isDropping then
             self.isDropping = false
-            if not InCombatLockdown() then
+            if not InCombatLockdown() and not HealcraftDB.settings.lockSpells then
                 -- Call our swap function
                 local success = HandleReceiveSpell(self, self.dropID, self.dropSubType)
                 
@@ -395,6 +404,8 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
                 if not success and self.oldType then
                     self:SetAttribute("type", self.oldType)
                 end
+            elseif self.oldType then
+                self:SetAttribute("type", self.oldType)
             end
         end
     end)
@@ -514,6 +525,11 @@ function ns.UpdateSlotsVisibility()
     local isDraggingSpell = (cursorType == "spell")
     local s = HealcraftDB.settings
 
+    -- If locked or in combat, do not consider dragging as a reason to show slots
+    if InCombatLockdown() or s.lockSpells then
+        isDraggingSpell = false
+    end
+
     for unitID, row in pairs(rows) do
         for i = 1, s.slotsCount do
             local slot = row.slots[i]
@@ -584,7 +600,8 @@ initFrame:RegisterEvent("PLAYER_LOGIN")
 initFrame:RegisterEvent("PARTY_MEMBERS_CHANGED")
 initFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 initFrame:RegisterEvent("UNIT_AURA")
-initFrame:RegisterEvent("CURSOR_UPDATE")
+initFrame:RegisterEvent("ACTIONBAR_SHOWGRID")
+initFrame:RegisterEvent("ACTIONBAR_HIDEGRID")
 
 initFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "PLAYER_LOGIN" then
@@ -624,7 +641,7 @@ initFrame:SetScript("OnEvent", function(self, event, arg1)
     elseif event == "SPELL_UPDATE_COOLDOWN" then
         if ns.IsActive() then UpdateCooldowns() end
 
-    elseif event == "CURSOR_UPDATE" then
+    elseif event == "ACTIONBAR_SHOWGRID" or event == "ACTIONBAR_HIDEGRID" then
         if ns.IsActive() then ns.UpdateSlotsVisibility() end
 
     elseif event == "UNIT_AURA" then

@@ -100,12 +100,11 @@ local function RefreshVisuals(panelName)
     end
 end
 
-local workingPanel = nil
 local alignFrom = nil
 
 -- Slider creation template
-local function CreateSlider(text, minVal, maxVal, step, dbKey, x, y)
-    local slider = CreateFrame("Slider", addonName..dbKey.."Slider", workingPanel, "OptionsSliderTemplate")
+local function CreateSlider(panel, text, minVal, maxVal, step, dbKey, x, y)
+    local slider = CreateFrame("Slider", addonName..dbKey.."Slider", panel, "OptionsSliderTemplate")
     SLIDERS[dbKey] = slider;
     slider:SetPoint("TOPLEFT", alignFrom, "BOTTOMLEFT", x, y)
     slider:SetMinMaxValues(minVal, maxVal)
@@ -117,13 +116,13 @@ local function CreateSlider(text, minVal, maxVal, step, dbKey, x, y)
         value = math.floor(value + 0.5) -- Round to integers
         HealcraftDB.settings[dbKey] = value
         _G[self:GetName().."Text"]:SetText(text .. ": " .. value)
-        RefreshVisuals(workingPanel.name)
+        RefreshVisuals(panel.name)
     end)
     return slider
 end
 
-local function CreateCheckbox(text, dbKey, x, y, callback)
-    local checkbox = CreateFrame("CheckButton", addonName .. dbKey.."CheckButton", workingPanel, "InterfaceOptionsCheckButtonTemplate")
+local function CreateCheckbox(panel, text, dbKey, x, y, callback)
+    local checkbox = CreateFrame("CheckButton", addonName .. dbKey.."CheckButton", panel, "InterfaceOptionsCheckButtonTemplate")
     CHECKBOXES[dbKey] = checkbox;
     checkbox:SetPoint("TOPLEFT", alignFrom, "BOTTOMLEFT", x, y)
     _G[checkbox:GetName() .. "Text"]:SetText(" " .. text)
@@ -133,7 +132,7 @@ local function CreateCheckbox(text, dbKey, x, y, callback)
             callback(self)
         else
             HealcraftDB.settings[dbKey] = (self:GetChecked() ~= nil)
-            RefreshVisuals(workingPanel.name)
+            RefreshVisuals(panel.name)
         end
     end)
 
@@ -142,7 +141,6 @@ end
 -- -----------------------------------------------------------------------
 -- General tab contents
 -- -----------------------------------------------------------------------
-workingPanel = generalPanel
 alignFrom = generalPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 alignFrom:SetPoint("TOPLEFT", 16, -16)
 alignFrom:SetText("Healcraft: General")
@@ -155,23 +153,23 @@ local dropdownsOffset = 10;
 local addYGap = 7;
 
 -- Master switch
-local activeCb = CreateCheckbox("Enable addon (Master Switch)", "isActive", 0, gapYTitles, function(self)
+local activeCb = CreateCheckbox(generalPanel, "Enable addon (Master Switch)", "isActive", 0, gapYTitles, function(self)
     ns.SetActive(self:GetChecked() ~= nil)
 end)
 
 -- === Left slider column ===
 alignFrom = activeCb
-alignFrom = CreateSlider("Slots count", 1, 5, 1, "slotsCount", slidersOffset, gapYSliders+addYGap)
-alignFrom = CreateSlider("Offset X", -12, 30, 1, "offsetX", 0, gapYSliders)
-alignFrom = CreateSlider("Slots gap", -4, 30, 1, "slotGap", 0, gapYSliders)
+alignFrom = CreateSlider(generalPanel, "Slots count", 1, 5, 1, "slotsCount", slidersOffset, gapYSliders+addYGap)
+alignFrom = CreateSlider(generalPanel, "Offset X", -12, 30, 1, "offsetX", 0, gapYSliders)
+alignFrom = CreateSlider(generalPanel, "Slots gap", -4, 30, 1, "slotGap", 0, gapYSliders)
 
 local lastLeftItem = alignFrom;
 
 -- === Right slider column ===
 alignFrom = activeCb
-alignFrom = CreateSlider("Slot size", 18, 75, 1, "slotSize", 200, gapYSliders+addYGap)
-alignFrom = CreateSlider("Offset Y", -20, 30, 1, "offsetY", 0, gapYSliders)
-alignFrom = CreateSlider("Spells transparency", 10, 100, 5, "alphaButtons", 0, gapYSliders)
+alignFrom = CreateSlider(generalPanel, "Slot size", 18, 75, 1, "slotSize", 200, gapYSliders+addYGap)
+alignFrom = CreateSlider(generalPanel, "Offset Y", -20, 30, 1, "offsetY", 0, gapYSliders)
+alignFrom = CreateSlider(generalPanel, "Spells transparency", 10, 100, 5, "alphaButtons", 0, gapYSliders)
 
 -- === Below columns ===
 -- Slot flash mode
@@ -200,7 +198,7 @@ UIDropDownMenu_Initialize(flashDD, InitFlashDropdown)
 
 -- Lock spells
 alignFrom = flashDD
-alignFrom = CreateCheckbox("Lock spells (instant cast, no drag&drop)", "lockSpells", dropdownsOffset, gapYCheckboxes-addYGap, function(self)
+alignFrom = CreateCheckbox(generalPanel, "Lock spells (instant cast, no drag&drop)", "lockSpells", dropdownsOffset, gapYCheckboxes-addYGap, function(self)
     if InCombatLockdown() then
         print("|cffff0000[Healcraft]|r Cannot change this setting during combat!")
         self:SetChecked(HealcraftDB.settings.lockSpells)
@@ -210,23 +208,22 @@ alignFrom = CreateCheckbox("Lock spells (instant cast, no drag&drop)", "lockSpel
     if ns.UpdateCastingBehavior then ns.UpdateCastingBehavior() end
 end)
 
-alignFrom = CreateCheckbox("Show tooltips on spells", "showTooltips", 0, gapYCheckboxes)
+alignFrom = CreateCheckbox(generalPanel, "Show tooltips on spells", "showTooltips", 0, gapYCheckboxes)
 
 -- TODO: Modifiers for drag & drop
 
 -- -----------------------------------------------------------------------
 -- Buff settings
 -- -----------------------------------------------------------------------
-workingPanel = buffsPanel;
 alignFrom = buffsPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 alignFrom:SetPoint("TOPLEFT", 16, -16)
 alignFrom:SetText("Healcraft: Buffs")
 
-alignFrom = CreateCheckbox("Enable buffs", "buffsActive", 0, gapYTitles)
-alignFrom = CreateCheckbox("Show timer on buffs", "showTimer", 0, gapYCheckboxes)
-alignFrom = CreateCheckbox("Show spell stacks", "showStacks", 0, gapYCheckboxes)
-alignFrom = CreateCheckbox("Show tooltips on buffs", "showTooltipsBuffs", 0, gapYCheckboxes)
-alignFrom = CreateSlider("Buffs transparency", 10, 100, 5, "alphaBuffs", slidersOffset, gapYSliders+addYGap)
+alignFrom = CreateCheckbox(generalPanel, "Enable buffs", "buffsActive", 0, gapYTitles)
+alignFrom = CreateCheckbox(generalPanel, "Show timer on buffs", "showTimer", 0, gapYCheckboxes)
+alignFrom = CreateCheckbox(generalPanel, "Show spell stacks", "showStacks", 0, gapYCheckboxes)
+alignFrom = CreateCheckbox(generalPanel, "Show tooltips on buffs", "showTooltipsBuffs", 0, gapYCheckboxes)
+alignFrom = CreateSlider(generalPanel, "Buffs transparency", 10, 100, 5, "alphaBuffs", slidersOffset, gapYSliders+addYGap)
 -- -----------------------------------------------------------------------
 -- Sync UI with DB on load
 -- -----------------------------------------------------------------------

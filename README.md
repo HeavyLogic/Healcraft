@@ -36,3 +36,7 @@ Inspired by the Healium addon. Designed to preserve the original WoW look and fe
 
 - **SexyMap** — The minimap button can be moved freely and its position is remembered.
 - **MoveAnything** — When party frames are moved, spell buttons and buff indicators move with them.
+
+### Screenshot
+
+![screenshot](https://media.forgecdn.net/attachments/1691/104/img-2026-05-21-00-15-53-png.png)
