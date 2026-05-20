@@ -6,13 +6,95 @@ local BUFF_OFFSET_Y = -1
 local URGENT_TIME = 5
 local MAX_SUPPORTED_SLOTS = 5 -- Резервируем максимум слотов
 
+local GetTime = GetTime
+local ceil = math.ceil
+
 -- Настройки шрифта
 local FONT_FILE = "Fonts\\FRIZQT__.TTF" -- Стандартный шрифт интерфейса WoW
 local FONT_NORMAL_SIZE = 10
 local FONT_URGENT_SIZE = 13
 
+local TEXT_STYLES = {
+    normal = {
+        size = FONT_NORMAL_SIZE,
+        r = 1,
+        g = 0.82,
+        b = 0
+    },
+    urgent = {
+        size = FONT_URGENT_SIZE,
+        r = 1,
+        g = 0,
+        b = 0
+    },
+    stacks = {
+        size = FONT_NORMAL_SIZE,
+        r = 0.4,
+        g = 1,
+        b = 0.4
+    }
+}
+
 local buffRows = {}
 local previousBuffs = {}
+
+local function SetBuffTextStyle(slot, styleName)
+    if slot.textStyle == styleName then
+        return
+    end
+
+    slot.textStyle = styleName
+    local style = TEXT_STYLES[styleName]
+
+    slot.buffText:SetFont(
+        FONT_FILE,
+        style.size,
+        "OUTLINE"
+    )
+    slot.buffText:SetTextColor(
+        style.r,
+        style.g,
+        style.b
+    )
+end
+
+local function BuffSlot_OnUpdate(self)
+    local remain = self.expirationTime - GetTime()
+    if remain <= 0 then
+        self.expirationTime = 0
+        self.lastSec = -1
+
+        if self.buffText:GetText() ~= "" then
+            self.buffText:SetText("")
+        end
+
+        self:SetScript("OnUpdate", nil)
+        return
+    end
+
+    local currentSec = ceil(remain)
+    if currentSec == self.lastSec then
+        return
+    end
+
+    self.lastSec = currentSec
+    
+    if remain <= URGENT_TIME then
+        if self.textStyle ~= "urgent" then
+            SetBuffTextStyle(self, "urgent")
+        end
+    elseif self.textStyle == "urgent" then
+        SetBuffTextStyle(self, "normal")
+    end
+
+    if remain <= 20 then
+        self.buffText:SetText(currentSec)
+    else
+        if self.buffText:GetText() ~= "" then
+            self.buffText:SetText("")
+        end
+    end
+end
 
 local function CreateBuffSlot(parent, unitID)
     local slot = CreateFrame("Frame", nil, parent)
@@ -36,63 +118,14 @@ local function CreateBuffSlot(parent, unitID)
     textFrame:SetAllPoints()
     textFrame:SetFrameLevel(cd:GetFrameLevel() + 2) -- Делаем уровень выше, чем у cd
 
-    -- Это стаки заклинаний (Lifebloom у друида)
+    -- Текст для таймера и для стеков заклинаний
     local buffText = textFrame:CreateFontString(nil, "OVERLAY")
     buffText:SetPoint("CENTER", textFrame, "CENTER", 0, 0)
-    buffText:SetFont(FONT_FILE, FONT_NORMAL_SIZE, "OUTLINE")
     slot.buffText = buffText
+    SetBuffTextStyle(slot, "normal")
 
-    slot.isUrgent = false
     slot.hasStacks = false
     slot.lastSec = -1 -- Для оптимизации OnUpdate
-
-    slot:SetScript("OnUpdate", function(self)
-        if self.hasStacks then
-            return
-        end
-
-        if self.expirationTime and self.expirationTime > 0 then
-            local remain = self.expirationTime - GetTime()
-            if remain > 0 then
-                -- ОПТИМИЗАЦИЯ: Обновляем текст и проверки только если изменилась целая секунда
-                local currentSec = math.ceil(remain)
-                if currentSec ~= self.lastSec then
-                    self.lastSec = currentSec
-                    
-                    local s = PartySpellsDB.settings
-                    if remain <= URGENT_TIME then
-                        if not self.isUrgent then
-                            self.isUrgent = true
-                            if s.showTimer then
-                                self.buffText:SetFont(FONT_FILE, FONT_URGENT_SIZE, "OUTLINE")
-                                self.buffText:SetTextColor(1, 0, 0)
-                            end
-                        end
-                    else
-                        if self.isUrgent then
-                            self.isUrgent = false
-                            if s.showTimer then
-                                self.buffText:SetFont(FONT_FILE, FONT_NORMAL_SIZE, "OUTLINE")
-                                self.buffText:SetTextColor(1, 0.82, 0)
-                            end
-                        end
-                    end
-
-                    -- 2. Рисуем текст ТОЛЬКО если осталось <= 20 секунд
-                    if s.showTimer and remain <= 20 then
-                        self.buffText:SetText(currentSec)
-                    else
-                        self.buffText:SetText("")
-                    end
-                end
-            else
-                self.expirationTime = 0
-                self.isUrgent = false
-                self.buffText:SetText("")
-                self.lastSec = -1
-            end
-        end
-    end)
 
     slot:EnableMouse(true)
     slot:SetScript("OnEnter", function(self)
@@ -176,15 +209,20 @@ function ns.UpdateBuffs(unitID)
                 
                 if stacks and stacks > 1 then
                     slot.buffText:SetText("x"..stacks)
-                    slot.buffText:SetFont(FONT_FILE, FONT_NORMAL_SIZE, "OUTLINE")
-                    slot.buffText:SetTextColor(0.4, 1, 0.4)
                     slot.hasStacks = true
+                    SetBuffTextStyle(slot, "stacks")
                 else
                     slot.buffText:SetText("")
                     slot.hasStacks = false
                 end
 
                 if duration and duration > 0 and expirationTime then
+                    if not slot.hasStacks and settings.showTimer then
+                        slot:SetScript("OnUpdate", BuffSlot_OnUpdate)
+                    else
+                        slot:SetScript("OnUpdate", nil)
+                    end
+
                     -- Обновляем кулдаун только если изменилось время истечения
                     if slot.expirationTime ~= expirationTime then
                         local start = expirationTime - duration
@@ -196,15 +234,14 @@ function ns.UpdateBuffs(unitID)
                     -- ИСПРАВЛЕНИЕ: Сбрасываем красный цвет при обновлении баффа
                     local remain = expirationTime - GetTime()
                     if remain > URGENT_TIME then
-                        slot.isUrgent = false
                         if settings.showTimer and not slot.hasStacks then
-                            slot.buffText:SetFont(FONT_FILE, FONT_NORMAL_SIZE, "OUTLINE")
-                            slot.buffText:SetTextColor(1, 0.82, 0)
+                            SetBuffTextStyle(slot, "normal")
                         end
                     end
                 else
                     slot.cd:Hide()
                     slot.expirationTime = 0
+                    slot:SetScript("OnUpdate", nil)
                     slot.buffText:SetText("")
                 end
 
@@ -233,7 +270,6 @@ function ns.UpdateBuffs(unitID)
         local slot = rowData.slots[i]
         slot:Hide()
         slot.expirationTime = 0
-        slot.isUrgent = false
         slot.buffText:SetText("")
     end
 end
