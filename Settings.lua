@@ -100,11 +100,12 @@ local function RefreshVisuals(panelName)
     end
 end
 
+local workingPanel = nil
 local alignFrom = nil
 
 -- Шаблон создания слайдера
-local function CreateSlider(panel, text, minVal, maxVal, step, dbKey, x, y)
-    local slider = CreateFrame("Slider", addonName..dbKey.."Slider", panel, "OptionsSliderTemplate")
+local function CreateSlider(text, minVal, maxVal, step, dbKey, x, y)
+    local slider = CreateFrame("Slider", addonName..dbKey.."Slider", workingPanel, "OptionsSliderTemplate")
     SLIDERS[dbKey] = slider;
     slider:SetPoint("TOPLEFT", alignFrom, "BOTTOMLEFT", x, y)
     slider:SetMinMaxValues(minVal, maxVal)
@@ -116,13 +117,13 @@ local function CreateSlider(panel, text, minVal, maxVal, step, dbKey, x, y)
         value = math.floor(value + 0.5) -- Округляем до целых
         PartySpellsDB.settings[dbKey] = value
         _G[self:GetName().."Text"]:SetText(text .. ": " .. value)
-        RefreshVisuals(panel.name)
+        RefreshVisuals(workingPanel.name)
     end)
     return slider
 end
 
-local function CreateCheckbox(panel, text, dbKey, x, y, callback)
-    local checkbox = CreateFrame("CheckButton", addonName .. dbKey.."CheckButton", panel, "InterfaceOptionsCheckButtonTemplate")
+local function CreateCheckbox(text, dbKey, x, y, callback)
+    local checkbox = CreateFrame("CheckButton", addonName .. dbKey.."CheckButton", workingPanel, "InterfaceOptionsCheckButtonTemplate")
     CHECKBOXES[dbKey] = checkbox;
     checkbox:SetPoint("TOPLEFT", alignFrom, "BOTTOMLEFT", x, y)
     _G[checkbox:GetName() .. "Text"]:SetText(" " .. text)
@@ -132,7 +133,7 @@ local function CreateCheckbox(panel, text, dbKey, x, y, callback)
             callback(self)
         else
             PartySpellsDB.settings[dbKey] = (self:GetChecked() ~= nil)
-            RefreshVisuals(panel.name)
+            RefreshVisuals(workingPanel.name)
         end
     end)
 
@@ -141,6 +142,7 @@ end
 -- -----------------------------------------------------------------------
 -- Наполнение вкладки General
 -- -----------------------------------------------------------------------
+workingPanel = generalPanel
 alignFrom = generalPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 alignFrom:SetPoint("TOPLEFT", 16, -16)
 alignFrom:SetText("PartySpells: General")
@@ -153,24 +155,24 @@ local dropdownsOffset = 10;
 local addYGap = 7;
 
 -- Master switch
-local activeCb = CreateCheckbox(generalPanel, "Включить аддон (Master Switch)", "isActive", 0, gapYTitles, function(self)
+local activeCb = CreateCheckbox("Включить аддон (Master Switch)", "isActive", 0, gapYTitles, function(self)
     ns.SetActive(self:GetChecked() ~= nil)
     print(self:GetName())
 end)
 
 -- === Левая колонка слайдеров ===
 alignFrom = activeCb
-alignFrom = CreateSlider(generalPanel, "Кол-во слотов", 1, 5, 1, "slotsCount", slidersOffset, gapYSliders+addYGap)
-alignFrom = CreateSlider(generalPanel, "Смещение по X", -12, 30, 1, "offsetX", 0, gapYSliders)
-alignFrom = CreateSlider(generalPanel, "Отступ между слотами", -4, 30, 1, "slotGap", 0, gapYSliders)
+alignFrom = CreateSlider("Кол-во слотов", 1, 5, 1, "slotsCount", slidersOffset, gapYSliders+addYGap)
+alignFrom = CreateSlider("Смещение по X", -12, 30, 1, "offsetX", 0, gapYSliders)
+alignFrom = CreateSlider("Отступ между слотами", -4, 30, 1, "slotGap", 0, gapYSliders)
 
 local lastLeftItem = alignFrom;
 
 -- === Правая колонка слайдеров ===
 alignFrom = activeCb
-alignFrom = CreateSlider(generalPanel, "Размер слота", 18, 75, 1, "slotSize", 200, gapYSliders+addYGap)
-alignFrom = CreateSlider(generalPanel, "Смещение по Y", -20, 30, 1, "offsetY", 0, gapYSliders)
-alignFrom = CreateSlider(generalPanel, "Прозрачность", 10, 100, 5, "alphaButtons", 0, gapYSliders)
+alignFrom = CreateSlider("Размер слота", 18, 75, 1, "slotSize", 200, gapYSliders+addYGap)
+alignFrom = CreateSlider("Смещение по Y", -20, 30, 1, "offsetY", 0, gapYSliders)
+alignFrom = CreateSlider("Прозрачность", 10, 100, 5, "alphaButtons", 0, gapYSliders)
 
 -- === Под колонками ===
 -- Режим вспышки слота
@@ -199,7 +201,7 @@ UIDropDownMenu_Initialize(flashDD, InitFlashDropdown)
 
 -- Закрепить заклинания
 alignFrom = flashDD
-alignFrom = CreateCheckbox(generalPanel, "Lock spells (Insta-cast, no Drag&Drop)", "lockSpells", dropdownsOffset, gapYCheckboxes-addYGap, function(self)
+alignFrom = CreateCheckbox("Lock spells (Insta-cast, no Drag&Drop)", "lockSpells", dropdownsOffset, gapYCheckboxes-addYGap, function(self)
     if InCombatLockdown() then
         print("|cffff0000[PartySpells]|r Нельзя менять эту настройку прямо во время боя!")
         self:SetChecked(PartySpellsDB.settings.lockSpells)
@@ -209,20 +211,23 @@ alignFrom = CreateCheckbox(generalPanel, "Lock spells (Insta-cast, no Drag&Drop)
     if ns.UpdateCastingBehavior then ns.UpdateCastingBehavior() end
 end)
 
+alignFrom = CreateCheckbox("Show tooltips on spells", "showTooltips", 0, gapYCheckboxes)
+
 -- TODO: Модификаторы для перетаскивания
 
 -- -----------------------------------------------------------------------
 -- Настройки баффов
 -- -----------------------------------------------------------------------
+workingPanel = buffsPanel;
 alignFrom = buffsPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 alignFrom:SetPoint("TOPLEFT", 16, -16)
 alignFrom:SetText("PartySpells: Buffs")
 
-alignFrom = CreateCheckbox(buffsPanel, "Включить отображение баффов", "buffsActive", 0, gapYTitles)
-alignFrom = CreateCheckbox(buffsPanel, "Показывать таймер на иконке", "showTimer", 0, gapYCheckboxes)
-alignFrom = CreateCheckbox(buffsPanel, "Показывать стаки заклинаний", "showStacks", 0, gapYCheckboxes)
-alignFrom = CreateSlider(buffsPanel, "Прозрачность", 10, 100, 5, "alphaBuffs", slidersOffset, gapYSliders+addYGap)
-
+alignFrom = CreateCheckbox("Включить отображение баффов", "buffsActive", 0, gapYTitles)
+alignFrom = CreateCheckbox("Показывать таймер на иконке", "showTimer", 0, gapYCheckboxes)
+alignFrom = CreateCheckbox("Показывать стаки заклинаний", "showStacks", 0, gapYCheckboxes)
+alignFrom = CreateCheckbox("Show tooltips on buffs", "showTooltipsBuffs", 0, gapYCheckboxes)
+alignFrom = CreateSlider("Прозрачность", 10, 100, 5, "alphaBuffs", slidersOffset, gapYSliders+addYGap)
 -- -----------------------------------------------------------------------
 -- Синхронизация UI с базой при загрузке
 -- -----------------------------------------------------------------------
