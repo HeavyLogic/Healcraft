@@ -61,11 +61,9 @@ local function UpdateHoverAlpha(row)
     if not row then return end
     local isOver = false
     
-    -- Проверяем наведение на обертку
     if row.visual and row.visual:IsVisible() and row.visual:IsMouseOver() then
         isOver = true
     else
-        -- Проверяем наведение на кнопки
         for i = 1, MAX_SUPPORTED_SLOTS do
             local slot = row.slots[i]
             if slot and slot:IsVisible() and slot:IsMouseOver() then
@@ -76,19 +74,12 @@ local function UpdateHoverAlpha(row)
     end
 
     local normalAlpha, hoverAlpha = GetRowAlphas()
-    local targetAlpha = isOver and hoverAlpha or normalAlpha
-    
-    local f = row.frame
-    f.targetAlpha = targetAlpha -- Записываем цель во фрейм
+    row.frame.targetAlpha = isOver and hoverAlpha or normalAlpha
 
+    -- Если плавная анимация отключена, мгновенно применяем альфу
     local s = HealcraftDB and HealcraftDB.settings
-    if s and s.alphaButtonsTransition then
-        -- Включаем плавную анимацию
-        f:SetScript("OnUpdate", RowFadeOnUpdate)
-    else
-        -- Мгновенное изменение
-        f:SetScript("OnUpdate", nil) -- Отключаем анимацию, если она шла
-        f:SetAlpha(targetAlpha)
+    if not (s and s.alphaButtonsTransition) then
+        row.frame:SetAlpha(row.frame.targetAlpha)
     end
 end
 
@@ -137,27 +128,89 @@ local function UpdateCooldowns()
 end
 
 -- -----------------------------------------------------------------------
--- Единый обслуживающий таймер (Дистанция + Защита от залипания мыши)
+-- Единый центральный игровой цикл Healcraft
 -- -----------------------------------------------------------------------
-local TICK_INTERVAL = 0.15 -- Проверка примерно 7 раз в секунду (очень легко для процессора)
+local TICK_INTERVAL = 0.15 
 local tickTimer = 0
+local FADE_SPEED = 5 -- Скорость затухания панелей
 
 local updateFrame = CreateFrame("Frame")
 updateFrame:SetScript("OnUpdate", function(self, elapsed)
     if not ns.IsActive() then return end
 
+    local s = HealcraftDB.settings
+
+    -- -------------------------------------------------------------------
+    -- ЧАСТЬ 1. Высокочастотные анимации (Выполняются каждый кадр)
+    -- -------------------------------------------------------------------
+    for unitID, row in pairs(rows) do
+        if row.frame:IsVisible() then
+            
+            -- Анимация плавного затухания панелей (Transition)
+            if s.alphaButtonsTransition and row.frame.targetAlpha then
+                local current = row.frame:GetAlpha()
+                local target = row.frame.targetAlpha
+                if math.abs(current - target) > 0.01 then
+                    local step = FADE_SPEED * elapsed
+                    if current < target then
+                        row.frame:SetAlpha(math.min(current + step, target))
+                    else
+                        row.frame:SetAlpha(math.max(current - step, target))
+                    end
+                elseif current ~= target then
+                    row.frame:SetAlpha(target)
+                end
+            end
+
+            -- Анимация вспышек кнопок при успешном касте
+            for i = 1, s.slotsCount do
+                local slot = row.slots[i]
+                if slot.isFlashing then
+                    slot.flashElapsed = slot.flashElapsed + elapsed
+                    local progress = slot.flashElapsed / 0.6 -- Длительность анимации 0.6 сек
+                    local flashTex = slot.flashTexture
+
+                    if progress >= 1 then
+                        slot.isFlashing = false
+                        flashTex:Hide()
+                    else
+                        if s.flashMode == 1 then
+                            flashTex:SetAlpha(1 - progress)
+                        elseif s.flashMode == 2 then
+                            flashTex:SetAlpha(1)
+                        elseif s.flashMode == 3 then
+                            -- 1. Плавное появление и затухание (синусоида)
+                            flashTex:SetAlpha(math.sin(progress * math.pi))
+                            
+                            -- 2. Вращение текстуры по часовой стрелке
+                            local angle = progress * (math.pi / 2)
+                            local cosA, sinA = math.cos(angle), math.sin(angle)
+                            
+                            local ULx, ULy = 0.5 - 0.5*cosA + 0.5*sinA, 0.5 - 0.5*sinA - 0.5*cosA
+                            local LLx, LLy = 0.5 - 0.5*cosA - 0.5*sinA, 0.5 - 0.5*sinA + 0.5*cosA
+                            local URx, URy = 0.5 + 0.5*cosA + 0.5*sinA, 0.5 + 0.5*sinA - 0.5*cosA
+                            local LRx, LRy = 0.5 + 0.5*cosA - 0.5*sinA, 0.5 + 0.5*sinA + 0.5*cosA
+                            
+                            flashTex:SetTexCoord(ULx, ULy, LLx, LLy, URx, URy, LRx, LRy)
+                        end
+                    end
+                end
+            end
+
+        end
+    end
+
+    -- -------------------------------------------------------------------
+    -- ЧАСТЬ 2. Низкочастотные проверки (Выполняются раз в 0.15 сек)
+    -- -------------------------------------------------------------------
     tickTimer = tickTimer + elapsed
     if tickTimer >= TICK_INTERVAL then
         tickTimer = 0
         
-        local s = HealcraftDB.settings
-        
-        -- Проходимся только по существующим рядам
         for unitID, row in pairs(rows) do
-            -- Работаем только если фрейм союзника виден на экране
             if row.frame:IsVisible() then
                 
-                -- 1. Проверка дистанции (если включена в настройках)
+                -- Проверка дистанции спеллов
                 if s.rangeCheck then
                     for i = 1, s.slotsCount do
                         local slot = row.slots[i]
@@ -172,7 +225,7 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
                     end
                 end
 
-                -- 2. Защита от залипания мыши (Проверяем реальное положение курсора)
+                -- Защита от залипания мыши (синхронизация состояния)
                 local isMouseActuallyOver = false
                 if row.visual and row.visual:IsVisible() and row.visual:IsMouseOver() then
                     isMouseActuallyOver = true
@@ -186,11 +239,9 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
                     end
                 end
 
-                -- Вычисляем, какая прозрачность ДОЛЖНА БЫТЬ у фрейма сейчас
                 local normalAlpha, hoverAlpha = GetRowAlphas()
                 local expectedTarget = isMouseActuallyOver and hoverAlpha or normalAlpha
                 
-                -- Если текущая цель прозрачности не совпадает с реальностью — исправляем это
                 if row.frame.targetAlpha ~= expectedTarget then
                     UpdateHoverAlpha(row)
                 end
@@ -344,49 +395,14 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     local flash = slot:CreateTexture(nil, "OVERLAY")
     flash:SetBlendMode("ADD")
     flash:Hide()
-
-    local fader = CreateFrame("Frame", nil, slot)
-    fader:Hide()
-    fader.elapsed = 0
-    fader:SetScript("OnUpdate", function(self, elapsed)
-        self.elapsed = self.elapsed + elapsed
-        if self.elapsed >= 0.6 then
-            flash:Hide()
-            self:Hide()
-        else
-            local s = HealcraftDB.settings
-            local progress = self.elapsed / 0.6
-            
-            if s.flashMode == 1 then
-                flash:SetAlpha(1 - progress)
-            elseif s.flashMode == 2 then
-                flash:SetAlpha(1)
-            elseif s.flashMode == 3 then
-                -- 1. Smooth fade in and out (Sine wave: 0 -> 1 -> 0)
-                flash:SetAlpha(math.sin(progress * math.pi))
-                
-                -- 2. Rotate the texture clockwise
-                -- Rotate 90 degrees (math.pi / 2) over the animation duration
-                local angle = progress * (math.pi / 2)
-                local cosA, sinA = math.cos(angle), math.sin(angle)
-                
-                -- Texture coordinate rotation matrix around center (0.5, 0.5)
-                local ULx, ULy = 0.5 - 0.5*cosA + 0.5*sinA, 0.5 - 0.5*sinA - 0.5*cosA
-                local LLx, LLy = 0.5 - 0.5*cosA - 0.5*sinA, 0.5 - 0.5*sinA + 0.5*cosA
-                local URx, URy = 0.5 + 0.5*cosA + 0.5*sinA, 0.5 + 0.5*sinA - 0.5*cosA
-                local LRx, LRy = 0.5 + 0.5*cosA - 0.5*sinA, 0.5 + 0.5*sinA + 0.5*cosA
-                
-                flash:SetTexCoord(ULx, ULy, LLx, LLy, URx, URy, LRx, LRy)
-            end
-        end
-    end)
+    slot.flashTexture = flash -- Сохраняем ссылку для глобального таймера
 
     slot.PlayFlash = function()
         local s = HealcraftDB.settings
         if not s.flashMode or s.flashMode == 0 then return end 
 
         flash:ClearAllPoints()
-        flash:SetTexCoord(0, 1, 0, 1) -- Always reset coords to default
+        flash:SetTexCoord(0, 1, 0, 1) -- Сброс координат по умолчанию
         
         if s.flashMode == 1 then
             flash:SetAllPoints(slot.icon)
@@ -398,16 +414,17 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
             flash:SetVertexColor(0, 1, 0, 1)
         elseif s.flashMode == 3 then
             flash:SetPoint("CENTER", slot, "CENTER", 0, 0)
-            flash:SetSize(s.slotSize * 1.25, s.slotSize * 1.25) -- 2x smaller
+            flash:SetSize(s.slotSize * 1.25, s.slotSize * 1.25)
             flash:SetTexture("Interface\\Cooldown\\star4")
-            flash:SetVertexColor(1, 1, 1, 1) -- White color
+            flash:SetVertexColor(1, 1, 1, 1)
         end
         
-        -- For mode 3 alpha starts at 0 to fade in smoothly
         flash:SetAlpha(s.flashMode == 3 and 0 or 1)
         flash:Show()
-        fader.elapsed = 0
-        fader:Show()
+
+        -- Передаем управление анимацией центральному циклу
+        slot.flashElapsed = 0
+        slot.isFlashing = true
     end
 
     local hl = slot:CreateTexture(nil, "HIGHLIGHT")
