@@ -58,40 +58,50 @@ local function SetBuffTextStyle(slot, styleName)
     )
 end
 
-local function BuffSlot_OnUpdate(self)
-    local remain = self.expirationTime - GetTime()
-    if remain <= 0 then
-        self.expirationTime = 0
-        self.lastSec = -1
-
-        if self.buffText:GetText() ~= "" then
-            self.buffText:SetText("")
-        end
-
-        self:SetScript("OnUpdate", nil)
-        return
-    end
-
-    local currentSec = ceil(remain)
-    if currentSec == self.lastSec then
-        return
-    end
-
-    self.lastSec = currentSec
+-- -----------------------------------------------------------------------
+-- ЦЕНТРАЛИЗОВАННЫЙ ТАЙМЕР БАФФОВ (Вызывается из основного файла)
+-- -----------------------------------------------------------------------
+function ns.UpdateAllBuffTimers()
+    local now = GetTime()
     
-    if remain <= URGENT_TIME then
-        if self.textStyle ~= "urgent" then
-            SetBuffTextStyle(self, "urgent")
-        end
-    elseif self.textStyle == "urgent" then
-        SetBuffTextStyle(self, "normal")
-    end
+    for unitID, rowData in pairs(buffRows) do
+        -- Обновляем таймеры только если фрейм баффов сейчас виден на экране
+        if rowData.frame:IsVisible() then
+            for i = 1, MAX_SUPPORTED_SLOTS do
+                local slot = rowData.slots[i]
+                
+                if slot:IsVisible() and slot.isTimerActive and slot.expirationTime and slot.expirationTime > 0 then
+                    local remain = slot.expirationTime - now
+                    
+                    if remain <= 0 then
+                        slot.expirationTime = 0
+                        slot.isTimerActive = false
+                        slot.lastSec = -1
+                        slot.buffText:SetText("")
+                    else
+                        local currentSec = ceil(remain)
+                        if currentSec ~= slot.lastSec then
+                            slot.lastSec = currentSec
+                            
+                            -- Меняем стиль текста на красный (срочный)
+                            if remain <= URGENT_TIME then
+                                if slot.textStyle ~= "urgent" then
+                                    SetBuffTextStyle(slot, "urgent")
+                                end
+                            elseif slot.textStyle == "urgent" then
+                                SetBuffTextStyle(slot, "normal")
+                            end
 
-    if remain <= 20 then
-        self.buffText:SetText(currentSec)
-    else
-        if self.buffText:GetText() ~= "" then
-            self.buffText:SetText("")
+                            -- Показываем цифры отсчета только если осталось 20 сек и меньше
+                            if remain <= 20 then
+                                slot.buffText:SetText(currentSec)
+                            else
+                                slot.buffText:SetText("")
+                            end
+                        end
+                    end
+                end
+            end
         end
     end
 end
@@ -125,7 +135,8 @@ local function CreateBuffSlot(parent, unitID)
     SetBuffTextStyle(slot, "normal")
 
     slot.hasStacks = false
-    slot.lastSec = -1 -- For OnUpdate optimization
+    slot.isTimerActive = false -- Логический флаг вместо OnUpdate скрипта
+    slot.lastSec = -1 
 
     slot:EnableMouse(true)
     slot:SetScript("OnEnter", function(self)
@@ -185,6 +196,7 @@ function ns.UpdateBuffs(unitID)
             local slot = rowData.slots[i]
             slot:Hide()
             slot.expirationTime = 0
+            slot.isTimerActive = false -- Сброс
         end
         previousBuffs[unitID] = {}
         return
@@ -220,9 +232,9 @@ function ns.UpdateBuffs(unitID)
 
                 if duration and duration > 0 and expirationTime then
                     if not slot.hasStacks and settings.showTimer then
-                        slot:SetScript("OnUpdate", BuffSlot_OnUpdate)
+                        slot.isTimerActive = true -- Запускаем таймер через флаг
                     else
-                        slot:SetScript("OnUpdate", nil)
+                        slot.isTimerActive = false
                     end
 
                     -- Update cooldown only if expiration time changed
@@ -230,7 +242,7 @@ function ns.UpdateBuffs(unitID)
                         local start = expirationTime - duration
                         CooldownFrame_SetTimer(slot.cd, start, duration, 1)
                         slot.expirationTime = expirationTime
-                        slot.lastSec = -1 -- Reset timer for OnUpdate
+                        slot.lastSec = -1 
                     end
                     
                     -- Reset red color on buff refresh
@@ -243,7 +255,7 @@ function ns.UpdateBuffs(unitID)
                 else
                     slot.cd:Hide()
                     slot.expirationTime = 0
-                    slot:SetScript("OnUpdate", nil)
+                    slot.isTimerActive = false -- Сброс флага
                     slot.buffText:SetText("")
                 end
 
@@ -272,6 +284,7 @@ function ns.UpdateBuffs(unitID)
         local slot = rowData.slots[i]
         slot:Hide()
         slot.expirationTime = 0
+        slot.isTimerActive = false -- Сброс
         slot.buffText:SetText("")
     end
 end

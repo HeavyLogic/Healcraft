@@ -119,6 +119,10 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
         local dt = fastTickTimer 
         fastTickTimer = 0
 
+        if ns.UpdateAllBuffTimers then
+            ns.UpdateAllBuffTimers()
+        end
+
         -- 1. Отслеживание изменения состояния курсора (взяли/бросили спелл)
         local cursorType = GetCursorInfo()
         local isDraggingSpell = (cursorType == "spell")
