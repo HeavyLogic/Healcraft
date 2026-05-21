@@ -137,41 +137,64 @@ local function UpdateCooldowns()
 end
 
 -- -----------------------------------------------------------------------
--- Range Check (Optimized timer)
+-- Единый обслуживающий таймер (Дистанция + Защита от залипания мыши)
 -- -----------------------------------------------------------------------
-local RANGE_CHECK_INTERVAL = 0.2 -- Check 5 times per second
-local rangeTimer = 0
+local TICK_INTERVAL = 0.15 -- Проверка примерно 7 раз в секунду (очень легко для процессора)
+local tickTimer = 0
 
-local rangeFrame = CreateFrame("Frame")
-rangeFrame:SetScript("OnUpdate", function(self, elapsed)
-    local s = HealcraftDB.settings
-    if not ns.IsActive() or not s.rangeCheck then return end
+local updateFrame = CreateFrame("Frame")
+updateFrame:SetScript("OnUpdate", function(self, elapsed)
+    if not ns.IsActive() then return end
 
-    rangeTimer = rangeTimer + elapsed
-
-    -- Once 0.2 sec has passed, do the check
-    if rangeTimer >= RANGE_CHECK_INTERVAL then
-        rangeTimer = 0
+    tickTimer = tickTimer + elapsed
+    if tickTimer >= TICK_INTERVAL then
+        tickTimer = 0
         
-        -- Iterate only over existing rows
+        local s = HealcraftDB.settings
+        
+        -- Проходимся только по существующим рядам
         for unitID, row in pairs(rows) do
-            -- Check only if the row is visible (party member exists)
+            -- Работаем только если фрейм союзника виден на экране
             if row.frame:IsVisible() then
-                for i = 1, s.slotsCount do
-                    local slot = row.slots[i]
-                    if slot.spellName then
-                        -- IsSpellInRange natively understands string spell names in 3.3.5
-                        local inRange = IsSpellInRange(slot.spellName, slot.unitID)
-                        
-                        -- If 0 is returned, the spell definitely doesn't reach the target
-                        if inRange == 0 then
-                            slot.outOfRange:Show()
-                        else
-                            -- In all other cases (in range or invalid target) - hide
-                            slot.outOfRange:Hide()
+                
+                -- 1. Проверка дистанции (если включена в настройках)
+                if s.rangeCheck then
+                    for i = 1, s.slotsCount do
+                        local slot = row.slots[i]
+                        if slot.spellName then
+                            local inRange = IsSpellInRange(slot.spellName, slot.unitID)
+                            if inRange == 0 then
+                                slot.outOfRange:Show()
+                            else
+                                slot.outOfRange:Hide()
+                            end
                         end
                     end
                 end
+
+                -- 2. Защита от залипания мыши (Проверяем реальное положение курсора)
+                local isMouseActuallyOver = false
+                if row.visual and row.visual:IsVisible() and row.visual:IsMouseOver() then
+                    isMouseActuallyOver = true
+                else
+                    for i = 1, MAX_SUPPORTED_SLOTS do
+                        local slot = row.slots[i]
+                        if slot and slot:IsVisible() and slot:IsMouseOver() then
+                            isMouseActuallyOver = true
+                            break
+                        end
+                    end
+                end
+
+                -- Вычисляем, какая прозрачность ДОЛЖНА БЫТЬ у фрейма сейчас
+                local normalAlpha, hoverAlpha = GetRowAlphas()
+                local expectedTarget = isMouseActuallyOver and hoverAlpha or normalAlpha
+                
+                -- Если текущая цель прозрачности не совпадает с реальностью — исправляем это
+                if row.frame.targetAlpha ~= expectedTarget then
+                    UpdateHoverAlpha(row)
+                end
+
             end
         end
     end
