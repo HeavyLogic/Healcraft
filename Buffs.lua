@@ -218,14 +218,14 @@ function ns.UpdateBuffs(unitID)
                 slot.icon:SetTexture(icon)
                 slot.buffIndex = i
                 
-                -- Сбрасываем секундный маркер, чтобы центральный таймер мгновенно перерисовал время
+                -- Reset second marker so the central timer instantly redraws the time
                 slot.lastSec = -1
 
-                -- Определяем, что именно мы должны показать на баффе
+                -- Determine what exactly to show on the buff
                 local showStacks = (stacks and stacks > 1 and settings.showStacks)
                 local showTimer  = (duration and duration > 0 and expirationTime and not showStacks and settings.showTimer)
 
-                -- Логика стаков
+                -- Stacks logic
                 if showStacks then
                     slot.buffText:SetText("x"..stacks)
                     slot.hasStacks = true
@@ -233,24 +233,24 @@ function ns.UpdateBuffs(unitID)
                     slot.isTimerActive = false
                 else
                     slot.hasStacks = false
-                    -- Очищаем текст только если мы НЕ собираемся показывать там таймер
+                    -- Clear text only if we are NOT going to show a timer there
                     if not showTimer then
                         slot.buffText:SetText("")
                     end
                 end
 
-                -- Логика таймера
+                -- Timer logic
                 if duration and duration > 0 and expirationTime then
                     slot.isTimerActive = showTimer
 
-                    -- Обновляем кулдаун только если изменилось время окончания
+                    -- Update cooldown only if expiration time changed
                     if slot.expirationTime ~= expirationTime then
                         local start = expirationTime - duration
                         CooldownFrame_SetTimer(slot.cd, start, duration, 1)
                         slot.expirationTime = expirationTime
                     end
                     
-                    -- Сбрасываем красный цвет на желтый, если бафф обновили (время увеличилось)
+                    -- Reset red color to yellow if buff was refreshed (time increased)
                     local remain = expirationTime - GetTime()
                     if remain > URGENT_TIME then
                         if showTimer then
