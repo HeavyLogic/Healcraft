@@ -1,3 +1,5 @@
+Я пишу аддон для WoW 3.3.5. Вот это моя страница настроек:
+```
 local addonName, ns = ...
 
 -- -----------------------------------------------------------------------
@@ -66,19 +68,29 @@ function ns.ToggleActive() ns.SetActive(not ns.IsActive()) end
 -- -----------------------------------------------------------------------
 -- Create Settings Windows (OmniCC Style)
 -- -----------------------------------------------------------------------
-mainPanel = nil
 function ns.OpenSettings()
     InterfaceOptionsFrame_OpenToCategory(_G[addonName .. "GeneralPanel"])
     InterfaceOptionsFrame_OpenToCategory(_G[addonName .. "GeneralPanel"])
 end
 
-mainPanel = CreateFrame("Frame", addonName .. "MainPanel", UIParent)
+local mainPanel = CreateFrame("Frame", addonName .. "MainPanel", UIParent)
 mainPanel.name = addonName
 InterfaceOptions_AddCategory(mainPanel)
+
+local generalPanel = CreateFrame("Frame", addonName .. "GeneralPanel", mainPanel)
+generalPanel.name = "General"
+generalPanel.parent = addonName
+InterfaceOptions_AddCategory(generalPanel)
+
+local buffsPanel = CreateFrame("Frame", addonName .. "BuffsPanel", mainPanel)
+buffsPanel.name = "Buffs"
+buffsPanel.parent = addonName
+InterfaceOptions_AddCategory(buffsPanel)
 
 mainPanel:SetScript("OnShow", function()
     ns.OpenSettings()
 end)
+
 -- -----------------------------------------------------------------------
 -- Templates
 -- -----------------------------------------------------------------------
@@ -128,88 +140,14 @@ local function CreateCheckbox(panel, text, dbKey, x, y, callback)
 
     return checkbox
 end
-
--- -----------------------------------------------------------------------
--- Helper Functions for Scrollable Tabs
--- -----------------------------------------------------------------------
-
--- Инициализирует вкладку, создает неподвижный заголовок и возвращает контейнер настроек
--- Инициализирует вкладку: создает базовую панель, регистрирует в системе настроек и настраивает скролл
-local function tabStart(tabId, titleText)
-    -- 1. Создаем базовый фрейм панели настроек
-    local panel = CreateFrame("Frame", addonName .. tabId .. "Panel", mainPanel)
-    panel.name = titleText
-    panel.parent = mainPanel.name or mainPanel:GetName()
-    
-    InterfaceOptions_AddCategory(panel)
-
-    -- 2. Создаем неподвижный заголовок
-    local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", 16, -16)
-    title:SetPoint("TOPRIGHT", -16, -16)
-    title:SetJustifyH("LEFT")
-    title:SetJustifyV("TOP")
-    title:SetText(addonName .. ": " .. titleText)
-
-    -- 3. Создаем ScrollFrame
-    local scrollFrame = CreateFrame("ScrollFrame", panel:GetName() .. "ScrollFrame", panel, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 16, -42)
-    scrollFrame:SetPoint("BOTTOMRIGHT", -32, 16)
-
-    -- 4. Создаем ScrollChild (контейнер контента)
-    local scrollChild = CreateFrame("Frame", panel:GetName() .. "ScrollChild", scrollFrame)
-    scrollChild:SetWidth(400)
-    scrollChild:SetHeight(1)
-    
-    scrollFrame:SetScrollChild(scrollChild)
-
-    scrollChild.name = tabId 
-    scrollChild.scrollFrame = scrollFrame
-
-    -- 5. Настройка полосы прокрутки
-    local scrollBar = _G[scrollFrame:GetName() .. "ScrollBar"]
-    scrollBar:ClearAllPoints()
-    scrollBar:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", 6, -16)
-    scrollBar:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", 6, 16)
-
-    -- 6. Создаем невидимый стартовый якорь для элементов внутри scrollChild
-    local anchor = CreateFrame("Frame", nil, scrollChild)
-    anchor:SetSize(1, 1)
-    anchor:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, 0)
-
-    -- Возвращаем два значения: сам контейнер и стартовый якорь для элементов
-    return scrollChild, anchor
-end
-
--- Автоматически вычисляет высоту прокрутки по нижнему краю последнего элемента
-local function tabEnd(scrollChild, lastElement)
-    if not scrollChild or not lastElement then return end
-
-    local scrollFrame = scrollChild.scrollFrame
-    if not scrollFrame then return end
-
-    -- Подписываемся на отображение панели для точного расчета координат
-    scrollFrame:HookScript("OnShow", function()
-        local top = scrollChild:GetTop()
-        local bottom = lastElement:GetBottom()
-
-        if top and bottom then
-            -- Вычисляем разницу высоты и делим на масштаб кадра (UI Scale), 
-            -- чтобы избежать искажений на разных разрешениях экрана.
-            local scale = scrollChild:GetEffectiveScale()
-            local contentHeight = ((top - bottom) / scale) + 20 -- 20px запас снизу
-
-            scrollChild:SetHeight(contentHeight)
-        end
-    end)
-end
 -- -----------------------------------------------------------------------
 -- General tab contents
 -- -----------------------------------------------------------------------
--- 1. Начинаем вкладку (передаем саму панель и текст заголовка)
-local generalScroll, anchor = tabStart("General", "General")
-alignFrom = anchor -- Задаем начальную точку привязки для элементов
+alignFrom = generalPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+alignFrom:SetPoint("TOPLEFT", 16, -16)
+alignFrom:SetText("Healcraft: General")
 
+local gapYTitles = -16;
 local gapYSliders = -32;
 local gapYCheckboxes = -5;
 local slidersOffset = 9;
@@ -217,27 +155,27 @@ local dropdownsOffset = 10;
 local addYGap = 7;
 
 -- Master switch
-local activeCb = CreateCheckbox(generalScroll, "Enable addon (Master Switch)", "isActive", 0, 0, function(self)
+local activeCb = CreateCheckbox(generalPanel, "Enable addon (Master Switch)", "isActive", 0, gapYTitles, function(self)
     ns.SetActive(self:GetChecked() ~= nil)
 end)
 
 -- === Left slider column ===
 alignFrom = activeCb
-alignFrom = CreateSlider(generalScroll, "Slots count", 1, 5, 1, "slotsCount", slidersOffset, gapYSliders+addYGap)
-alignFrom = CreateSlider(generalScroll, "Offset X", -12, 30, 1, "offsetX", 0, gapYSliders)
-alignFrom = CreateSlider(generalScroll, "Slots gap", -4, 30, 1, "slotGap", 0, gapYSliders)
+alignFrom = CreateSlider(generalPanel, "Slots count", 1, 5, 1, "slotsCount", slidersOffset, gapYSliders+addYGap)
+alignFrom = CreateSlider(generalPanel, "Offset X", -12, 30, 1, "offsetX", 0, gapYSliders)
+alignFrom = CreateSlider(generalPanel, "Slots gap", -4, 30, 1, "slotGap", 0, gapYSliders)
 
 local lastLeftItem = alignFrom;
 
 -- === Right slider column ===
 alignFrom = activeCb
-alignFrom = CreateSlider(generalScroll, "Slot size", 18, 75, 1, "slotSize", 200, gapYSliders+addYGap)
-alignFrom = CreateSlider(generalScroll, "Offset Y", -20, 30, 1, "offsetY", 0, gapYSliders)
-alignFrom = CreateSlider(generalScroll, "Spells transparency", 10, 100, 5, "alphaButtons", 0, gapYSliders)
+alignFrom = CreateSlider(generalPanel, "Slot size", 18, 75, 1, "slotSize", 200, gapYSliders+addYGap)
+alignFrom = CreateSlider(generalPanel, "Offset Y", -20, 30, 1, "offsetY", 0, gapYSliders)
+alignFrom = CreateSlider(generalPanel, "Spells transparency", 10, 100, 5, "alphaButtons", 0, gapYSliders)
 
 -- === Below columns ===
 -- Slot flash mode
-local flashDD = CreateFrame("Frame", addonName.."FlashDropdown", generalScroll, "UIDropDownMenuTemplate")
+local flashDD = CreateFrame("Frame", addonName.."FlashDropdown", generalPanel, "UIDropDownMenuTemplate")
 flashDD:SetPoint("TOPLEFT", lastLeftItem, "BOTTOMLEFT", 0-slidersOffset-dropdownsOffset, gapYSliders-addYGap)
 local flashLabel = flashDD:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 flashLabel:SetPoint("BOTTOMLEFT", flashDD, "TOPLEFT", 16, 3)
@@ -262,7 +200,7 @@ UIDropDownMenu_Initialize(flashDD, InitFlashDropdown)
 
 -- Lock spells
 alignFrom = flashDD
-alignFrom = CreateCheckbox(generalScroll, "Lock spells (instant cast, no drag&drop)", "lockSpells", dropdownsOffset, gapYCheckboxes-addYGap, function(self)
+alignFrom = CreateCheckbox(generalPanel, "Lock spells (instant cast, no drag&drop)", "lockSpells", dropdownsOffset, gapYCheckboxes-addYGap, function(self)
     if InCombatLockdown() then
         print("|cffff0000[Healcraft]|r Cannot change this setting during combat!")
         self:SetChecked(HealcraftDB.settings.lockSpells)
@@ -272,28 +210,22 @@ alignFrom = CreateCheckbox(generalScroll, "Lock spells (instant cast, no drag&dr
     if ns.UpdateCastingBehavior then ns.UpdateCastingBehavior() end
 end)
 
-alignFrom = CreateCheckbox(generalScroll, "Show tooltips on spells", "showTooltips", 0, gapYCheckboxes)
+alignFrom = CreateCheckbox(generalPanel, "Show tooltips on spells", "showTooltips", 0, gapYCheckboxes)
 
 -- TODO: Modifiers for drag & drop
-
--- 2. Завершаем вкладку, передавая контейнер и последний элемент
-tabEnd(generalScroll, alignFrom)
 
 -- -----------------------------------------------------------------------
 -- Buff settings
 -- -----------------------------------------------------------------------
--- 1. Начинаем вкладку
-local buffsScroll, anchor = tabStart("Buffs", "Баффы")
-alignFrom = anchor
+alignFrom = buffsPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+alignFrom:SetPoint("TOPLEFT", 16, -16)
+alignFrom:SetText("Healcraft: Buffs")
 
-alignFrom = CreateCheckbox(buffsScroll, "Enable buffs", "buffsActive", 0, 0)
-alignFrom = CreateCheckbox(buffsScroll, "Show timer on buffs", "showTimer", 0, gapYCheckboxes)
-alignFrom = CreateCheckbox(buffsScroll, "Show spell stacks", "showStacks", 0, gapYCheckboxes)
-alignFrom = CreateCheckbox(buffsScroll, "Show tooltips on buffs", "showTooltipsBuffs", 0, gapYCheckboxes)
-alignFrom = CreateSlider(buffsScroll, "Buffs transparency", 10, 100, 5, "alphaBuffs", slidersOffset, gapYSliders+addYGap)
-
--- 2. Завершаем вкладку
-tabEnd(buffsScroll, alignFrom)
+alignFrom = CreateCheckbox(buffsPanel, "Enable buffs", "buffsActive", 0, gapYTitles)
+alignFrom = CreateCheckbox(buffsPanel, "Show timer on buffs", "showTimer", 0, gapYCheckboxes)
+alignFrom = CreateCheckbox(buffsPanel, "Show spell stacks", "showStacks", 0, gapYCheckboxes)
+alignFrom = CreateCheckbox(buffsPanel, "Show tooltips on buffs", "showTooltipsBuffs", 0, gapYCheckboxes)
+alignFrom = CreateSlider(buffsPanel, "Buffs transparency", 10, 100, 5, "alphaBuffs", slidersOffset, gapYSliders+addYGap)
 -- -----------------------------------------------------------------------
 -- Sync UI with DB on load
 -- -----------------------------------------------------------------------
@@ -317,3 +249,5 @@ initFrame:SetScript("OnEvent", function()
         FLASH_TEXTS[s.flashMode] or FLASH_TEXTS[defs.flashMode]
     )
 end)
+```
+Подскажи, а как мне сделать, чтобы на вкладках (General и Buffs) работал вертикальный скролл? Примерно как в CSS, когда ты делаешь overflow: auto.
