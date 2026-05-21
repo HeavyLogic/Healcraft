@@ -66,27 +66,38 @@ local function UpdatePosition(angle)
     minimapButton:SetPoint("CENTER", Minimap, "CENTER", x, y)
 end
 
+local dragTimer = 0
+local DRAG_TICK = 0.02 -- Интервал обновления (0.02 сек = 50 FPS). Плавно, но ограничено.
+
 minimapButton:RegisterForDrag("LeftButton")
 minimapButton:SetScript("OnDragStart", function(self)
     self:LockHighlight()
-    self:SetScript("OnUpdate", function()
-        local mx, my = Minimap:GetCenter()
-        local px, py = GetCursorPosition()
-        local scale = Minimap:GetEffectiveScale()
-        px, py = px / scale, py / scale
-        
-        local angle = math.atan2(py - my, px - mx)
-        
-        if not HealcraftDB then HealcraftDB = {} end
-        HealcraftDB.minimapAngle = angle
-        
-        UpdatePosition(angle)
+    
+    local scale = Minimap:GetEffectiveScale()
+    local mx, my = Minimap:GetCenter()
+    
+    if not HealcraftDB then HealcraftDB = {} end
+    dragTimer = 0 -- Сбрасываем таймер перед началом
+    
+    self:SetScript("OnUpdate", function(f, elapsed)
+        dragTimer = dragTimer + elapsed
+        if dragTimer >= DRAG_TICK then
+            dragTimer = 0 -- Сбрасываем накопитель времени
+            
+            local px, py = GetCursorPosition()
+            px, py = px / scale, py / scale
+            
+            local angle = math.atan2(py - my, px - mx)
+            HealcraftDB.minimapAngle = angle
+            
+            UpdatePosition(angle)
+        end
     end)
 end)
 
 minimapButton:SetScript("OnDragStop", function(self)
     self:UnlockHighlight()
-    self:SetScript("OnUpdate", nil)
+    self:SetScript("OnUpdate", nil) -- Полностью убираем OnUpdate
 end)
 
 -- -----------------------------------------------------------------------
