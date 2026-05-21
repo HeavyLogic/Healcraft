@@ -2,7 +2,7 @@ local addonName, ns = ...
 
 local ADDON_NAME  = "Healcraft"
 
--- party1..4 only — player is NOT included
+-- party1..4 only — player is not included
 -- PartyMemberFrame1 = first party member, etc.
 local UNITS = { "party1", "party2", "party3", "party4" }
 
@@ -15,17 +15,17 @@ local FRAMES = {
 
 local rows = {}
 local MAX_SUPPORTED_SLOTS = 5
-local dbSettings = nil -- Локальный кэш для HealcraftDB.settings
+local dbSettings = nil -- Local cache for HealcraftDB.settings
 
 local rows = {}
 local MAX_SUPPORTED_SLOTS = ns.MAX_SUPPORTED_SLOTS
 
 -- -----------------------------------------------------------------------
--- Логика изменения прозрачности при наведении (Hover Alpha)
+-- Hover alpha transparency logic
 -- -----------------------------------------------------------------------
 local function GetRowAlphas()
     local s = HealcraftDB and HealcraftDB.settings
-    -- Значения по умолчанию, если настройки еще не созданы в БД
+    -- Default values if settings are not yet created in DB
     local normal = (s and s.alphaButtons or 80) / 100
     local hover  = (s and s.alphaButtonsHover or 100) / 100
     return normal, hover
@@ -34,7 +34,7 @@ end
 local function UpdateHoverAlpha(row)
     if not row then return end
     
-    -- Проверяем наведение СТРОГО на блок visual
+    -- Check hover strictly on the visual block
     local isOver = false
     if row.visual and row.visual:IsVisible() and row.visual:IsMouseOver() then
         isOver = true
@@ -97,10 +97,10 @@ local function UpdateCooldowns()
 end
 
 -- -----------------------------------------------------------------------
--- Единый обслуживающий таймер (Очищенный и оптимизированный)
+-- Unified maintenance timer (Cleaned and optimized)
 -- -----------------------------------------------------------------------
-local TICK_INTERVAL      = 0.15   -- Низкая частота (Дистанция)
-local TICK_INTERVAL_FAST = 0.03   -- Высокая частота (Анимации и Ховер)
+local TICK_INTERVAL      = 0.15   -- Low frequency (Range)
+local TICK_INTERVAL_FAST = 0.03   -- High frequency (Animations and Hover)
 
 local tickTimer = 0
 local fastTickTimer = 0
@@ -112,7 +112,7 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
     local s = dbSettings
 
     -- -------------------------------------------------------------------
-    -- ЧАСТЬ 1. Анимации, Курсор и Ховер (Выполняются раз в TICK_INTERVAL_FAST)
+    -- Part 1: Animations, cursor and hover (run every TICK_INTERVAL_FAST)
     -- -------------------------------------------------------------------
     fastTickTimer = fastTickTimer + elapsed
     if fastTickTimer >= TICK_INTERVAL_FAST then
@@ -123,7 +123,7 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
             ns.UpdateAllBuffTimers()
         end
 
-        -- 1. Отслеживание изменения состояния курсора (взяли/бросили спелл)
+        -- Track cursor state changes (picked up/dropped spell)
         local cursorType = GetCursorInfo()
         local isDraggingSpell = (cursorType == "spell")
         if InCombatLockdown() or (s and s.lockSpells) then
@@ -135,7 +135,7 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
             ns.RefreshLayout()
         end
 
-        -- 2. Отслеживание наведения мыши СТРОГО на блок visual (33 FPS)
+        -- Track mouse hover strictly on the visual block (33 FPS)
         for _, row in pairs(rows) do
             if row.frame:IsVisible() then
                 local isMouseActuallyOver = false
@@ -146,14 +146,14 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
                 local normalAlpha, hoverAlpha = GetRowAlphas()
                 local expectedTarget = isMouseActuallyOver and hoverAlpha or normalAlpha
                 
-                -- Если текущая цель прозрачности не совпадает с физическим положением мыши
+                -- If current target alpha doesn't match actual mouse position
                 if row.frame.targetAlpha ~= expectedTarget then
                     UpdateHoverAlpha(row)
                 end
             end
         end
 
-        -- 3. Анимация плавного затухания панелей (Transition)
+        -- Smooth panel fade animation (transition)
         local transitionVal = s.alphaButtonsTransition or 0
         transitionVal = transitionVal / 10
         for unitID, row in pairs(rows) do
@@ -174,7 +174,7 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
                     end
                 end
 
-                -- 4. Анимация вспышек кнопок при успешном касте
+                -- Button flash animation on successful cast
                 for i = 1, s.slotsCount do
                     local slot = row.slots[i]
                     if slot.isFlashing then
@@ -211,7 +211,7 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
     end
 
     -- -------------------------------------------------------------------
-    -- ЧАСТЬ 2. Проверки логики (Выполняются раз в TICK_INTERVAL)
+    -- Part 2: Logic checks (run every TICK_INTERVAL)
     -- -------------------------------------------------------------------
     tickTimer = tickTimer + elapsed
     if tickTimer >= TICK_INTERVAL then
@@ -219,7 +219,7 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
         
         for unitID, row in pairs(rows) do
             if row.frame:IsVisible() then
-                -- Проверка дистанции спеллов
+                -- Spell range check
                 if s.rangeCheck then
                     for i = 1, s.slotsCount do
                         local slot = row.slots[i]
@@ -319,13 +319,13 @@ local function ClearSlot(slot)
 end
 
 -- -----------------------------------------------------------------------
--- Проверка модификаторов для начала перетаскивания
+-- Modifier check for starting drag
 -- -----------------------------------------------------------------------
 local function IsDragAllowed()
     local s = HealcraftDB and HealcraftDB.settings
     if not s then return true end
 
-    -- Если настройка включена, но соответствующая клавиша НЕ зажата — блокируем drag
+    -- If setting is on but the corresponding key is NOT held — block drag
     if s.dragCtrl and not IsControlKeyDown() then
         return false
     end
@@ -336,7 +336,7 @@ local function IsDragAllowed()
         return false
     end
 
-    -- Во всех остальных случаях (или если галочки не стоят вообще) — разрешаем
+    -- In all other cases (or if no checkboxes are set) — allow
     return true
 end
 
@@ -382,14 +382,14 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     local flash = slot:CreateTexture(nil, "OVERLAY")
     flash:SetBlendMode("ADD")
     flash:Hide()
-    slot.flashTexture = flash -- Сохраняем ссылку для глобального таймера
+    slot.flashTexture = flash -- Save reference for the global timer
 
     slot.PlayFlash = function()
         local s = HealcraftDB.settings
         if not s.flashMode or s.flashMode == 0 then return end 
 
         flash:ClearAllPoints()
-        flash:SetTexCoord(0, 1, 0, 1) -- Сброс координат по умолчанию
+        flash:SetTexCoord(0, 1, 0, 1) -- Reset coordinates to default
         
         if s.flashMode == 1 then
             flash:SetAllPoints(slot.icon)
@@ -409,7 +409,7 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
         flash:SetAlpha(s.flashMode == 3 and 0 or 1)
         flash:Show()
 
-        -- Передаем управление анимацией центральному циклу
+        -- Pass animation control to the central loop
         slot.flashElapsed = 0
         slot.isFlashing = true
     end
@@ -418,12 +418,12 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     hl:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
     hl:SetAllPoints(slot)
     hl:SetBlendMode("ADD")
-    slot.hl = hl -- Keep reference for later use!
+    slot.hl = hl -- Keep reference for later use
 
     slot:EnableMouse(true)
     slot:RegisterForDrag("LeftButton")
 
-    -- Хуки для отслеживания наведения мыши на кнопки
+    -- Hooks for tracking mouse hover on buttons
     slot:SetScript("OnEnter", function(self)
         if not HealcraftDB.settings.showTooltips then return end
         
@@ -538,7 +538,7 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
 -- drag start (pick up spell from slot like action bar)
     slot:SetScript("OnDragStart", function(self)
         if self.spellName and not InCombatLockdown() and not HealcraftDB.settings.lockSpells then
-            -- Проверяем, зажаты ли требуемые модификаторы перед тем, как «взять» заклинание
+            -- Check if required modifiers are held before "picking up" the spell
             if IsDragAllowed() then
                 PickupSpell(self.spellName)
                 ClearSlot(self)
@@ -552,7 +552,7 @@ end
 -- -----------------------------------------------------------------------
 -- Create row for one party member
 -- -----------------------------------------------------------------------
--- Настройки внутренних отступов для visual
+-- Visual padding settings
 local PADDING_LEFT   = 8
 local PADDING_RIGHT  = 8
 local PADDING_TOP    = 2
@@ -561,11 +561,11 @@ local PADDING_BOTTOM = 2
 local function CreateRow(unitID, anchor)
     if rows[unitID] then return end
 
-    -- 1. Невидимый логический фрейм-контейнер (не ловит мышь)
+    -- Invisible logical frame container (does not catch mouse)
     local rowFrame = CreateFrame("Frame", ADDON_NAME .. "Row_" .. unitID, anchor) 
-    rowFrame:SetSize(1, 1) -- Размер символический, все привязки пойдут к дочерним элементам
+    rowFrame:SetSize(1, 1) -- Symbolic size, all anchors go to child elements
 
-    -- 2. Визуальный фрейм-обертка (фон аддона и сенсор наведения мыши)
+    -- Visual wrapper frame (addon background and mouse hover sensor)
     local visual = CreateFrame("Frame", nil, rowFrame)
     -- visual:SetBackdrop({
     --     bgFile   = "Interface\\Buttons\\WHITE8x8",
@@ -573,16 +573,16 @@ local function CreateRow(unitID, anchor)
     --     edgeSize = 8,
     --     insets   = { left = 2, right = 2, top = 2, bottom = 2 },
     -- })
-    -- visual:SetBackdropColor(1, 0, 0, 0.45)    -- Красный полупрозрачный фон для теста
-    -- visual:SetBackdropBorderColor(1, 0, 0, 0.7) -- Граница
-    -- visual:SetFrameLevel(rowFrame:GetFrameLevel()) -- На уровень ниже кнопок (фон)
+    -- visual:SetBackdropColor(1, 0, 0, 0.45)    -- Red semi-transparent background for testing
+    -- visual:SetBackdropBorderColor(1, 0, 0, 0.7) -- Border
+    -- visual:SetFrameLevel(rowFrame:GetFrameLevel()) -- One level below buttons (background)
     visual:EnableMouse(true)
 
-    -- 3. Создаем слоты (их родителем является rowFrame)
+    -- Create slots (their parent is rowFrame)
     local slots = {}
     for i = 1, MAX_SUPPORTED_SLOTS do
         local slot = CreateSpellSlot(rowFrame, unitID, i)
-        slot:SetFrameLevel(rowFrame:GetFrameLevel() + 2) -- Кнопки ВСЕГДА поверх фона обертки
+    slot:SetFrameLevel(rowFrame:GetFrameLevel() + 2) -- Buttons always above the wrapper background
         slots[i] = slot
     end
 
@@ -615,8 +615,8 @@ local function RefreshRows()
     local groupSize = GetNumPartyMembers()
     local isActive = ns.IsActive() -- Check master switch
 
-    -- ОПТИМИЗАЦИЯ: Включаем таймер только если аддон активен И мы в группе.
-    -- Если мы соло или аддон отключен — OnUpdate засыпает и потребляет 0% CPU.
+    -- Optimization: enable timer only if addon is active and we are in a group.
+    -- If solo or addon is disabled, OnUpdate sleeps and uses 0% cpu.
     if isActive and groupSize > 0 then
         updateFrame:Show()
     else
@@ -708,35 +708,35 @@ end
 
 function ns.RefreshLayout()
     if not HealcraftDB or not HealcraftDB.settings then return end
-    -- Изменять структуру фреймов во время боя запрещено защищенными механизмами игры
+    -- Changing frame structure during combat is forbidden by the game's secure mechanisms
     if InCombatLockdown() then return end 
 
     local s = HealcraftDB.settings
-    local numRows = s.rows or 1 -- По умолчанию 1 ряд
+    local numRows = s.rows
 
     for unitID, rowData in pairs(rows) do
         local anchor = FRAMES[unitID]
         if anchor then
-            -- 1. Позиционируем базовый невидимый фрейм-контейнер (он центрирован по высоте)
+            -- Position the base invisible container frame (centered vertically)
             rowData.frame:ClearAllPoints()
             rowData.frame:SetPoint("LEFT", anchor, "RIGHT", tonumber(s.offsetX) or 0, tonumber(s.offsetY) or 0)
 
-            -- Вычисляем распределение слотов по рядам
+            -- Calculate slot distribution across rows
             local slotsRow1 = s.slotsCount
             if numRows == 2 then
                 slotsRow1 = math.ceil(s.slotsCount / 2)
             end
 
-            -- Вычисляем общую высоту сетки и сдвиг вверх для вертикального центрирования
+            -- Calculate total grid height and upward shift for vertical centering
             local totalGridHeight
             if numRows == 2 then
                 totalGridHeight = 2 * s.slotSize + s.slotGap
             else
                 totalGridHeight = s.slotSize
             end
-            local shiftY = totalGridHeight / 2 -- Сдвиг вверх на половину высоты блока
+            local shiftY = totalGridHeight / 2 -- Shift up by half the block height
 
-            -- 2. Пересчитываем положение кнопок
+            -- Recalculate button positions
             for i = 1, MAX_SUPPORTED_SLOTS do
                 local slot = rowData.slots[i]
                 if i <= s.slotsCount then
@@ -745,26 +745,26 @@ function ns.RefreshLayout()
                     
                     if numRows == 2 then
                         if i <= slotsRow1 then
-                            -- Первый ряд (Сверху)
+                            -- First row (Top)
                             if i == 1 then
-                                -- Смещаем первый слот вверх на shiftY, чтобы отцентрировать всю группу
+                                -- Shift first slot up by shiftY to center the whole group
                                 slot:SetPoint("TOPLEFT", rowData.frame, "TOPLEFT", 0, shiftY)
                             else
                                 slot:SetPoint("LEFT", rowData.slots[i-1], "RIGHT", s.slotGap, 0)
                             end
                         else
-                            -- Второй ряд (Снизу)
+                            -- Second row (Bottom)
                             if i == slotsRow1 + 1 then
-                                -- Вторая строка встает под первой кнопкой с отступом вниз
+                                -- Second row sits below the first button with a downward offset
                                 slot:SetPoint("TOPLEFT", rowData.slots[1], "BOTTOMLEFT", 0, -s.slotGap)
                             else
                                 slot:SetPoint("LEFT", rowData.slots[i-1], "RIGHT", s.slotGap, 0)
                             end
                         end
                     else
-                        -- Обычный один ряд
+                        -- Single normal row
                         if i == 1 then
-                            -- Смещаем единственный ряд вверх на половину высоты кнопки
+                            -- Shift the single row up by half the button height
                             slot:SetPoint("TOPLEFT", rowData.frame, "TOPLEFT", 0, shiftY)
                         else
                             slot:SetPoint("LEFT", rowData.slots[i-1], "RIGHT", s.slotGap, 0)
@@ -780,7 +780,7 @@ function ns.RefreshLayout()
                 end
             end
 
-            -- 3. Вычисляем крайние активные (непустые) кнопки в двумерной сетке
+            -- Calculate extreme active (non-empty) buttons in the 2d grid
             local cursorType = GetCursorInfo()
             local isDraggingSpell = (cursorType == "spell")
             if InCombatLockdown() or s.lockSpells then
@@ -812,9 +812,9 @@ function ns.RefreshLayout()
                 end
             end
 
-            -- 4. Растягиваем визуальную обертку rowData.visual по вычисленной сетке
+            -- Stretch the visual wrapper rowData.visual based on the calculated grid
             if minCol and maxCol and minRow and maxRow then
-                -- Математический расчет координат с учетом вертикального сдвига shiftY
+                -- Mathematical coordinate calculation with vertical shiftY
                 local x1 = (minCol - 1) * (s.slotSize + s.slotGap) - PADDING_LEFT
                 local x2 = maxCol * (s.slotSize + s.slotGap) - s.slotGap + PADDING_RIGHT
                 
@@ -829,7 +829,7 @@ function ns.RefreshLayout()
                 rowData.visual:Hide()
             end
 
-            -- Принудительно обновляем прозрачность с учетом текущего положения курсора
+            -- Force update transparency based on current cursor position
             UpdateHoverAlpha(rowData)
         end
     end
@@ -849,13 +849,13 @@ initFrame:RegisterEvent("UNIT_AURA")
 
 initFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "PLAYER_LOGIN" then
-        -- 1. First load the database and settings
+        -- First load the database and settings
         ns.InitDB()
 
-        -- Кэшируем настройки в локальную переменную
+        -- Cache settings in local variable
         dbSettings = HealcraftDB.settings
 
-        -- 2. Then create UI
+        -- Then create UI
         for _, unitID in ipairs(UNITS) do
             local anchor = FRAMES[unitID]
             if anchor then

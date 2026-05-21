@@ -9,7 +9,7 @@ local tabsWidth = 600
 ns.MAX_SUPPORTED_SLOTS = 6;
 
 -- -----------------------------------------------------------------------
--- Database Initialization
+-- Database initialization
 -- -----------------------------------------------------------------------
 function ns.InitDB()
     if not HealcraftDB then HealcraftDB = {} end
@@ -64,7 +64,7 @@ for _, opt in ipairs(FLASH_OPTIONS) do
 end
 
 -- -----------------------------------------------------------------------
--- Master-Switch logic
+-- Master-switch logic
 -- -----------------------------------------------------------------------
 function ns.IsActive()
     return HealcraftDB and HealcraftDB.settings.isActive
@@ -79,7 +79,7 @@ end
 
 function ns.ToggleActive() ns.SetActive(not ns.IsActive()) end
 -- -----------------------------------------------------------------------
--- Create Settings Windows (OmniCC Style)
+-- Create settings windows (OmniCC style)
 -- -----------------------------------------------------------------------
 mainPanel = nil
 function ns.OpenSettings()
@@ -162,17 +162,17 @@ local function CreateGroupBox(panel, titleText, height, y)
     box:SetBackdropBorderColor(0.5, 0.5, 0.5, 0.8)
     box:SetBackdropColor(0, 0, 0, 0)
     
-    -- ИСПОЛЬЗУЕМ КЛАССИЧЕСКИЙ ЖЕЛТЫЙ ШРИФТ (он меньше)
-    -- GameFontNormalSmall	Желтый	~10pt	Мелкие подписи, время на баффах
-    -- GameFontNormal	Желтый	~12pt	Стандартные подписи, имена НПС
-    -- GameFontNormalLarge	Желтый	~14pt	Заголовки средней величины
-    -- GameFontNormalHuge	Желтый	~18pt	Очень крупные заголовки окон
+    -- Use classic yellow font (smaller)
+    -- GameFontNormalSmall	Yellow	~10pt	Small labels, buff timers
+    -- GameFontNormal	Yellow	~12pt	Standard labels, NPC names
+    -- GameFontNormalLarge	Yellow	~14pt	Medium-sized headings
+    -- GameFontNormalHuge	Yellow	~18pt	Very large window titles
     local title = box:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     title:SetPoint("TOPLEFT", box, "TOPLEFT", 12, -12)
     title:SetText(titleText)
     
-    -- УВЕЛИЧИВАЕМ ОТСТУП ПОСЛЕ ПОДЗАГОЛОВКА
-    -- Смещение -16px вниз от текста заголовка создаст комфортный визуальный пробел
+    -- Increase indent after subheading
+    -- Offset -16px down from the title text creates a comfortable visual gap
     local anchor = CreateFrame("Frame", nil, box)
     anchor:SetSize(1, 1)
     anchor:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, 0-addYGap) 
@@ -180,23 +180,23 @@ local function CreateGroupBox(panel, titleText, height, y)
     return box, anchor
 end
 -- -----------------------------------------------------------------------
--- Helper Functions for Scrollable Tabs
+-- Helper functions for scrollable tabs
 -- -----------------------------------------------------------------------
 
--- Инициализирует вкладку, создает неподвижный заголовок и возвращает контейнер настроек
--- Инициализирует вкладку: создает базовую панель, регистрирует в системе настроек и настраивает скролл
+-- Initializes a tab, creates a fixed header and returns the settings container
+-- Initializes a tab: creates a base panel, registers in the settings system and configures scroll
 local tabId = 0;
 local function tabStart(titleText)
     tabId = tabId + 1
     local tabSlug = addonName .. "Panel" .. tabId;
-    -- 1. Создаем базовый фрейм панели настроек
+    -- Create the base settings panel frame
     local panel = CreateFrame("Frame", tabSlug, mainPanel)
     panel.name = titleText
     panel.parent = mainPanel.name or mainPanel:GetName()
     
     InterfaceOptions_AddCategory(panel)
 
-    -- 2. Создаем неподвижный заголовок
+    -- Create a fixed header
     local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 16, -16)
     title:SetPoint("TOPRIGHT", -16, -16)
@@ -204,12 +204,12 @@ local function tabStart(titleText)
     title:SetJustifyV("TOP")
     title:SetText(addonName .. ": " .. titleText)
 
-    -- 3. Создаем ScrollFrame
+    -- Create scrollframe
     local scrollFrame = CreateFrame("ScrollFrame", panel:GetName() .. "ScrollFrame", panel, "UIPanelScrollFrameTemplate")
     scrollFrame:SetPoint("TOPLEFT", 16, -42)
     scrollFrame:SetPoint("BOTTOMRIGHT", -32, 16)
 
-    -- 4. Создаем ScrollChild (контейнер контента)
+    -- Create scrollchild (content container)
     local scrollChild = CreateFrame("Frame", panel:GetName() .. "ScrollChild", scrollFrame)
     scrollChild:SetWidth(tabsWidth)
     scrollChild:SetHeight(1)
@@ -219,27 +219,27 @@ local function tabStart(titleText)
     scrollChild.name = tabSlug 
     scrollChild.scrollFrame = scrollFrame
 
-    -- 5. Настройка полосы прокрутки
+    -- Scrollbar setup
     local scrollBar = _G[scrollFrame:GetName() .. "ScrollBar"]
     scrollBar:ClearAllPoints()
     scrollBar:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", 6, -16)
     scrollBar:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", 6, 16)
 
-    -- 6. Создаем невидимый стартовый якорь для элементов внутри scrollChild
+    -- Create invisible starting anchor for elements inside scrollchild
     local anchor = CreateFrame("Frame", nil, scrollChild)
     anchor:SetSize(1, 1)
     anchor:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, 0)
 
-    -- Возвращаем два значения: сам контейнер и стартовый якорь для элементов
+    -- Return two values: the container itself and the starting anchor for elements
     return scrollChild, anchor
 end
 
 -- -----------------------------------------------------------------------
 -- General tab contents
 -- -----------------------------------------------------------------------
--- 1. Начинаем вкладку (передаем саму панель и текст заголовка)
+-- Start the tab (pass the panel itself and the header text)
 local generalScroll, anchor = tabStart("General")
-alignFrom = anchor -- Задаем начальную точку привязки для элементов
+alignFrom = anchor -- Set the starting anchor point for elements
 
 -- Master switch
 local activeCb = CreateCheckbox(generalScroll, "Enable addon (Master Switch)", "isActive", 0, 0, function(self)
@@ -314,8 +314,8 @@ alignFrom = CreateCheckbox(generalScroll, "Range check", "rangeCheck", 0, gapYCh
 -- -----------------------------------------------------------------------
 -- Buff settings
 -- -----------------------------------------------------------------------
--- 1. Начинаем вкладку
-local buffsScroll, anchor = tabStart("Баффы")
+-- Start the tab
+local buffsScroll, anchor = tabStart("Buffs")
 alignFrom = anchor
 
 alignFrom = CreateCheckbox(buffsScroll, "Enable buffs", "buffsActive", 0, 0)

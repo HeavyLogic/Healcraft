@@ -26,7 +26,7 @@ border:SetSize(54, 54)
 border:SetPoint("TOPLEFT", minimapButton, "TOPLEFT", 0, 0)
 
 -- -----------------------------------------------------------------------
--- Drag logic (With SexyMap shape awareness)
+-- Drag logic (with SexyMap shape awareness)
 -- -----------------------------------------------------------------------
 local function UpdatePosition(angle)
     local cos = math.cos(angle)
@@ -67,7 +67,7 @@ local function UpdatePosition(angle)
 end
 
 local dragTimer = 0
-local DRAG_TICK = 0.02 -- Интервал обновления (0.02 сек = 50 FPS). Плавно, но ограничено.
+local DRAG_TICK = 0.02 -- Update interval (0.02 sec = 50 FPS). Smooth but limited.
 
 minimapButton:RegisterForDrag("LeftButton")
 minimapButton:SetScript("OnDragStart", function(self)
@@ -77,12 +77,12 @@ minimapButton:SetScript("OnDragStart", function(self)
     local mx, my = Minimap:GetCenter()
     
     if not HealcraftDB then HealcraftDB = {} end
-    dragTimer = 0 -- Сбрасываем таймер перед началом
+    dragTimer = 0 -- Reset timer before starting
     
     self:SetScript("OnUpdate", function(f, elapsed)
         dragTimer = dragTimer + elapsed
         if dragTimer >= DRAG_TICK then
-            dragTimer = 0 -- Сбрасываем накопитель времени
+            dragTimer = 0 -- Reset time accumulator
             
             local px, py = GetCursorPosition()
             px, py = px / scale, py / scale
@@ -97,7 +97,7 @@ end)
 
 minimapButton:SetScript("OnDragStop", function(self)
     self:UnlockHighlight()
-    self:SetScript("OnUpdate", nil) -- Полностью убираем OnUpdate
+    self:SetScript("OnUpdate", nil) -- Completely remove onupdate
 end)
 
 -- -----------------------------------------------------------------------
@@ -122,7 +122,7 @@ function ns.UpdateMinimapIcon()
 end
 
 -- -----------------------------------------------------------------------
--- Clicks and Tooltips
+-- Clicks and tooltips
 -- -----------------------------------------------------------------------
 
 local function ShowTooltip(self)

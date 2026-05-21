@@ -59,13 +59,13 @@ local function SetBuffTextStyle(slot, styleName)
 end
 
 -- -----------------------------------------------------------------------
--- ЦЕНТРАЛИЗОВАННЫЙ ТАЙМЕР БАФФОВ (Вызывается из основного файла)
+-- Centralized buff timer (called from the main file)
 -- -----------------------------------------------------------------------
 function ns.UpdateAllBuffTimers()
     local now = GetTime()
     
     for unitID, rowData in pairs(buffRows) do
-        -- Обновляем таймеры только если фрейм баффов сейчас виден на экране
+        -- Update timers only if the buff frame is currently visible on screen
         if rowData.frame:IsVisible() then
             for i = 1, MAX_SUPPORTED_SLOTS do
                 local slot = rowData.slots[i]
@@ -83,7 +83,7 @@ function ns.UpdateAllBuffTimers()
                         if currentSec ~= slot.lastSec then
                             slot.lastSec = currentSec
                             
-                            -- Меняем стиль текста на красный (срочный)
+                            -- Change text style to red (urgent)
                             if remain <= URGENT_TIME then
                                 if slot.textStyle ~= "urgent" then
                                     SetBuffTextStyle(slot, "urgent")
@@ -92,7 +92,7 @@ function ns.UpdateAllBuffTimers()
                                 SetBuffTextStyle(slot, "normal")
                             end
 
-                            -- Показываем цифры отсчета только если осталось 20 сек и меньше
+                            -- Show countdown digits only if 20 seconds or less remain
                             if remain <= 20 then
                                 slot.buffText:SetText(currentSec)
                             else
@@ -123,7 +123,7 @@ local function CreateBuffSlot(parent, unitID)
     cd:SetDrawEdge(true)
     slot.cd = cd
 
-    -- Create a separate frame for texts to raise it ABOVE the cooldown shadow
+    -- Create a separate frame for texts to raise it above the cooldown shadow
     local textFrame = CreateFrame("Frame", nil, slot)
     textFrame:SetAllPoints()
     textFrame:SetFrameLevel(cd:GetFrameLevel() + 2) -- Set higher frame level than cd
@@ -135,7 +135,7 @@ local function CreateBuffSlot(parent, unitID)
     SetBuffTextStyle(slot, "normal")
 
     slot.hasStacks = false
-    slot.isTimerActive = false -- Логический флаг вместо OnUpdate скрипта
+    slot.isTimerActive = false -- Boolean flag instead of OnUpdate script
     slot.lastSec = -1 
 
     slot:EnableMouse(true)
@@ -196,7 +196,7 @@ function ns.UpdateBuffs(unitID)
             local slot = rowData.slots[i]
             slot:Hide()
             slot.expirationTime = 0
-            slot.isTimerActive = false -- Сброс
+            slot.isTimerActive = false -- Reset
         end
         previousBuffs[unitID] = {}
         return
@@ -232,7 +232,7 @@ function ns.UpdateBuffs(unitID)
 
                 if duration and duration > 0 and expirationTime then
                     if not slot.hasStacks and settings.showTimer then
-                        slot.isTimerActive = true -- Запускаем таймер через флаг
+                        slot.isTimerActive = true -- Start timer via flag
                     else
                         slot.isTimerActive = false
                     end
@@ -255,7 +255,7 @@ function ns.UpdateBuffs(unitID)
                 else
                     slot.cd:Hide()
                     slot.expirationTime = 0
-                    slot.isTimerActive = false -- Сброс флага
+                    slot.isTimerActive = false -- Reset flag
                     slot.buffText:SetText("")
                 end
 
@@ -284,7 +284,7 @@ function ns.UpdateBuffs(unitID)
         local slot = rowData.slots[i]
         slot:Hide()
         slot.expirationTime = 0
-        slot.isTimerActive = false -- Сброс
+        slot.isTimerActive = false -- Reset
         slot.buffText:SetText("")
     end
 end
