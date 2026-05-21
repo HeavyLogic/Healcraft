@@ -4,7 +4,7 @@ local BUFF_SIZE = 16 -- at 19, built-in timer appears
 local BUFF_GAP  = 3
 local BUFF_OFFSET_Y = -1
 local URGENT_TIME = 5
-local MAX_SUPPORTED_SLOTS = 5 -- Reserve maximum slots
+local MAX_SUPPORTED_SLOTS = ns.MAX_SUPPORTED_SLOTS -- Reserve maximum slots
 
 local GetTime = GetTime
 local ceil = math.ceil

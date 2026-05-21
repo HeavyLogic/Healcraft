@@ -6,6 +6,7 @@ local slidersOffset = 9;
 local dropdownsOffset = 10;
 local addYGap = 7;
 local tabsWidth = 600
+ns.MAX_SUPPORTED_SLOTS = 6;
 
 -- -----------------------------------------------------------------------
 -- Database Initialization
@@ -26,6 +27,8 @@ function ns.InitDB()
         flashMode  = 3,
         lockSpells = false,
         alphaButtons = 80,
+        alphaButtonsHover = 100,
+        alphaButtonsTransition = true,
         buffsActive = true,
         showTimer   = true,
         alphaBuffs  = 80,
@@ -35,7 +38,6 @@ function ns.InitDB()
         dragCtrl = false,
         dragAlt = false,
         dragShift = false,
-        alphaButtonsHover = 100,
         rangeCheck = true,
         rows = 1,
     }
@@ -246,10 +248,10 @@ end)
 
 -- === Left slider column ===
 alignFrom = activeCb
-alignFrom = CreateSlider(generalScroll, "Slots count", 1, 5, 1, "slotsCount", slidersOffset, gapYSliders+addYGap)
+alignFrom = CreateSlider(generalScroll, "Slots count", 1, ns.MAX_SUPPORTED_SLOTS, 1, "slotsCount", slidersOffset, gapYSliders+addYGap)
 alignFrom = CreateSlider(generalScroll, "Slot size", 18, 75, 1, "slotSize", 0, gapYSliders)
 alignFrom = CreateSlider(generalScroll, "Offset X", -12, 30, 1, "offsetX", 0, gapYSliders)
-alignFrom = CreateSlider(generalScroll, "Transparency", 10, 100, 5, "alphaButtons", 0, gapYSliders)
+alignFrom = CreateSlider(generalScroll, "Transparency", 0, 100, 5, "alphaButtons", 0, gapYSliders)
 local lastLeftItem = alignFrom;
 
 -- === Right slider column ===
@@ -257,10 +259,12 @@ alignFrom = activeCb
 alignFrom = CreateSlider(generalScroll, "Rows", 1, 2, 1, "rows", 200, gapYSliders+addYGap)
 alignFrom = CreateSlider(generalScroll, "Slots gap", -4, 30, 1, "slotGap", 0, gapYSliders)
 alignFrom = CreateSlider(generalScroll, "Offset Y", -20, 30, 1, "offsetY", 0, gapYSliders)
-alignFrom = CreateSlider(generalScroll, "Hover transparency", 10, 100, 5, "alphaButtonsHover", 0, gapYSliders)
+alignFrom = CreateSlider(generalScroll, "Hover transparency", 0, 100, 5, "alphaButtonsHover", 0, gapYSliders)
 alignFrom = lastLeftItem
 
 -- === Below columns ===
+alignFrom = CreateCheckbox(generalScroll, "Transparency soft transition", "alphaButtonsTransition", 0, 0)
+
 -- Slot flash mode
 local flashDD = CreateFrame("Frame", addonName.."FlashDropdown", generalScroll, "UIDropDownMenuTemplate")
 flashDD:SetPoint("TOPLEFT", alignFrom, "BOTTOMLEFT", 0-slidersOffset-dropdownsOffset, gapYSliders-addYGap)

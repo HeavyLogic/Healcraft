@@ -14,7 +14,7 @@ local FRAMES = {
 }
 
 local rows = {}
-local MAX_SUPPORTED_SLOTS = 5
+local MAX_SUPPORTED_SLOTS = ns.MAX_SUPPORTED_SLOTS
 
 -- -----------------------------------------------------------------------
 -- Настройки внутренних отступов (Padding) фрейма-обёртки
@@ -35,15 +35,37 @@ local function GetRowAlphas()
     return normal, hover
 end
 
+-- Скорость изменения альфы (значение 5 означает переход от 0 до 1 за 0.2 секунды)
+local FADE_SPEED = 5 
+
+-- Обработчик плавного затухания
+local function RowFadeOnUpdate(self, elapsed)
+    local current = self:GetAlpha()
+    local target = self.targetAlpha or current
+
+    -- Если разница ничтожно мала, завершаем анимацию
+    if math.abs(current - target) < 0.01 then
+        self:SetAlpha(target)
+        self:SetScript("OnUpdate", nil) -- Полностью отключаем OnUpdate для экономии процессора
+    else
+        local step = FADE_SPEED * elapsed
+        if current < target then
+            self:SetAlpha(math.min(current + step, target))
+        else
+            self:SetAlpha(math.max(current - step, target))
+        end
+    end
+end
+
 local function UpdateHoverAlpha(row)
     if not row then return end
     local isOver = false
     
-    -- Проверяем, наведен ли курсор на обертку
+    -- Проверяем наведение на обертку
     if row.visual and row.visual:IsVisible() and row.visual:IsMouseOver() then
         isOver = true
     else
-        -- Дополнительно проверяем кнопки (защита от потери фокуса на стыках)
+        -- Проверяем наведение на кнопки
         for i = 1, MAX_SUPPORTED_SLOTS do
             local slot = row.slots[i]
             if slot and slot:IsVisible() and slot:IsMouseOver() then
@@ -54,7 +76,20 @@ local function UpdateHoverAlpha(row)
     end
 
     local normalAlpha, hoverAlpha = GetRowAlphas()
-    row.frame:SetAlpha(isOver and hoverAlpha or normalAlpha)
+    local targetAlpha = isOver and hoverAlpha or normalAlpha
+    
+    local f = row.frame
+    f.targetAlpha = targetAlpha -- Записываем цель во фрейм
+
+    local s = HealcraftDB and HealcraftDB.settings
+    if s and s.alphaButtonsTransition then
+        -- Включаем плавную анимацию
+        f:SetScript("OnUpdate", RowFadeOnUpdate)
+    else
+        -- Мгновенное изменение
+        f:SetScript("OnUpdate", nil) -- Отключаем анимацию, если она шла
+        f:SetAlpha(targetAlpha)
+    end
 end
 
 -- Function that switches the button click mode
@@ -504,14 +539,14 @@ local function CreateRow(unitID, anchor)
 
     -- 2. Визуальный фрейм-обертка (фон аддона и сенсор наведения мыши)
     local visual = CreateFrame("Frame", nil, rowFrame)
-    visual:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        edgeSize = 8,
-        insets   = { left = 2, right = 2, top = 2, bottom = 2 },
-    })
-    visual:SetBackdropColor(1, 0, 0, 0.45)    -- Красный полупрозрачный фон для теста
-    visual:SetBackdropBorderColor(1, 0, 0, 0.7) -- Граница
+    -- visual:SetBackdrop({
+    --     bgFile   = "Interface\\Buttons\\WHITE8x8",
+    --     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    --     edgeSize = 8,
+    --     insets   = { left = 2, right = 2, top = 2, bottom = 2 },
+    -- })
+    -- visual:SetBackdropColor(1, 0, 0, 0.45)    -- Красный полупрозрачный фон для теста
+    -- visual:SetBackdropBorderColor(1, 0, 0, 0.7) -- Граница
     visual:SetFrameLevel(rowFrame:GetFrameLevel()) -- На уровень ниже кнопок (фон)
     visual:EnableMouse(true)
 

@@ -14,7 +14,7 @@ Inspired by the Healium addon. Designed to preserve the original WoW look and fe
 
 > Drag spells directly from your spellbook onto party member frames.
 
-- **Slot Count** — Up to 5 slots per party member (configurable).
+- **Slot Count** — Up to 6 slots per party member (configurable).
 - **Spell Locking** — Casts spells on button press instead of release and disables drag & drop. Enabled automatically during combat.
 - **Range Check** — Slots turn red when the target is out of range.
 - **Cooldown Display** — Cooldown spiral displayed on each spell slot.
