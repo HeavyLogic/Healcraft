@@ -229,28 +229,6 @@ local function tabStart(titleText)
     return scrollChild, anchor
 end
 
--- Автоматически вычисляет высоту прокрутки по нижнему краю последнего элемента
-local function tabEnd(scrollChild, lastElement)
-    if not scrollChild or not lastElement then return end
-
-    local scrollFrame = scrollChild.scrollFrame
-    if not scrollFrame then return end
-
-    -- Подписываемся на отображение панели для точного расчета координат
-    scrollFrame:HookScript("OnShow", function()
-        local top = scrollChild:GetTop()
-        local bottom = lastElement:GetBottom()
-
-        if top and bottom then
-            -- Вычисляем разницу высоты и делим на масштаб кадра (UI Scale), 
-            -- чтобы избежать искажений на разных разрешениях экрана.
-            local scale = scrollChild:GetEffectiveScale()
-            local contentHeight = ((top - bottom) / scale) + 20 -- 20px запас снизу
-
-            scrollChild:SetHeight(contentHeight)
-        end
-    end)
-end
 -- -----------------------------------------------------------------------
 -- General tab contents
 -- -----------------------------------------------------------------------
@@ -325,11 +303,6 @@ alignFrom = modifierBox
 alignFrom = CreateCheckbox(generalScroll, "Show tooltips on spells", "showTooltips", 0, 0-addYGap)
 alignFrom = CreateCheckbox(generalScroll, "Range check", "rangeCheck", 0, gapYCheckboxes)
 
--- TODO: Modifiers for drag & drop
-
--- 2. Завершаем вкладку, передавая контейнер и последний элемент
-tabEnd(generalScroll, alignFrom)
-
 -- -----------------------------------------------------------------------
 -- Buff settings
 -- -----------------------------------------------------------------------
@@ -343,8 +316,6 @@ alignFrom = CreateCheckbox(buffsScroll, "Show spell stacks", "showStacks", 0, ga
 alignFrom = CreateCheckbox(buffsScroll, "Show tooltips on buffs", "showTooltipsBuffs", 0, gapYCheckboxes)
 alignFrom = CreateSlider(buffsScroll, "Buffs transparency", 10, 100, 5, "alphaBuffs", slidersOffset, gapYSliders+addYGap)
 
--- 2. Завершаем вкладку
-tabEnd(buffsScroll, alignFrom)
 -- -----------------------------------------------------------------------
 -- Sync UI with DB on load
 -- -----------------------------------------------------------------------
