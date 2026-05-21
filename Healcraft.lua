@@ -622,10 +622,11 @@ end
 
 function ns.RefreshLayout()
     if not HealcraftDB or not HealcraftDB.settings then return end
-    -- Cannot change positions during combat (due to Secure buttons inside)
+    -- Изменять структуру фреймов во время боя запрещено защищенными механизмами игры
     if InCombatLockdown() then return end 
 
     local s = HealcraftDB.settings
+    local numRows = s.rows or 1 -- По умолчанию 1 ряд, если настройка не задана
 
     for unitID, rowData in pairs(rows) do
         local anchor = FRAMES[unitID]
@@ -634,16 +635,44 @@ function ns.RefreshLayout()
             rowData.frame:ClearAllPoints()
             rowData.frame:SetPoint("LEFT", anchor, "RIGHT", tonumber(s.offsetX) or 0, tonumber(s.offsetY) or 0)
 
-            -- 2. Пересчитываем положение кнопок (они строятся относительно невидимого rowData.frame)
+            -- Вычисляем распределение слотов по рядам
+            local slotsRow1 = s.slotsCount
+            if numRows == 2 then
+                -- Если количество нечетное, в первом ряду будет на 1 слот больше
+                slotsRow1 = math.ceil(s.slotsCount / 2)
+            end
+
+            -- 2. Пересчитываем положение кнопок (относительно rowData.frame)
             for i = 1, MAX_SUPPORTED_SLOTS do
                 local slot = rowData.slots[i]
                 if i <= s.slotsCount then
                     slot:SetSize(s.slotSize, s.slotSize)
                     slot:ClearAllPoints()
-                    if i == 1 then
-                        slot:SetPoint("LEFT", rowData.frame, "LEFT", 0, 0)
+                    
+                    if numRows == 2 then
+                        if i <= slotsRow1 then
+                            -- Первый ряд (Сверху)
+                            if i == 1 then
+                                slot:SetPoint("TOPLEFT", rowData.frame, "TOPLEFT", 0, 0)
+                            else
+                                slot:SetPoint("LEFT", rowData.slots[i-1], "RIGHT", s.slotGap, 0)
+                            end
+                        else
+                            -- Второй ряд (Снизу)
+                            if i == slotsRow1 + 1 then
+                                -- Первая кнопка второго ряда встает точно под первой кнопкой верхнего ряда
+                                slot:SetPoint("TOPLEFT", rowData.slots[1], "BOTTOMLEFT", 0, -s.slotGap)
+                            else
+                                slot:SetPoint("LEFT", rowData.slots[i-1], "RIGHT", s.slotGap, 0)
+                            end
+                        end
                     else
-                        slot:SetPoint("LEFT", rowData.slots[i-1], "RIGHT", s.slotGap, 0)
+                        -- Обычный один ряд
+                        if i == 1 then
+                            slot:SetPoint("TOPLEFT", rowData.frame, "TOPLEFT", 0, 0)
+                        else
+                            slot:SetPoint("LEFT", rowData.slots[i-1], "RIGHT", s.slotGap, 0)
+                        end
                     end
                     slot:Show()
                 else
@@ -655,31 +684,53 @@ function ns.RefreshLayout()
                 end
             end
 
-            -- 3. Вычисляем крайние активные (непустые) кнопки в ряду
+            -- 3. Вычисляем крайние активные (непустые) кнопки в двумерной сетке
             local cursorType = GetCursorInfo()
             local isDraggingSpell = (cursorType == "spell")
             if InCombatLockdown() or s.lockSpells then
                 isDraggingSpell = false
             end
 
-            local min_i, max_i = nil, nil
+            local minCol, maxCol, minRow, maxRow = nil, nil, nil, nil
             for i = 1, s.slotsCount do
                 local slot = rowData.slots[i]
-                -- Кнопка считается активной, если на ней есть спелл ИЛИ мы тащим спелл мышкой для настройки
                 if slot.spellName or isDraggingSpell then
-                    if not min_i then min_i = i end
-                    max_i = i
+                    local rowNum, colNum
+                    if numRows == 2 then
+                        if i <= slotsRow1 then
+                            rowNum = 1
+                            colNum = i
+                        else
+                            rowNum = 2
+                            colNum = i - slotsRow1
+                        end
+                    else
+                        rowNum = 1
+                        colNum = i
+                    end
+
+                    if not minCol or colNum < minCol then minCol = colNum end
+                    if not maxCol or colNum > maxCol then maxCol = colNum end
+                    if not minRow or rowNum < minRow then minRow = rowNum end
+                    if not maxRow or rowNum > maxRow then maxRow = rowNum end
                 end
             end
 
-            -- 4. Растягиваем визуальную обертку row.visual между крайними кнопками с учетом внутренних отступов (padding)
-            if min_i and max_i then
+            -- 4. Растягиваем визуальную обертку rowData.visual по вычисленной сетке
+            if minCol and maxCol and minRow and maxRow then
+                -- Математический расчет координат левого верхнего и правого нижнего углов
+                local x1 = (minCol - 1) * (s.slotSize + s.slotGap) - PADDING_LEFT
+                local x2 = maxCol * (s.slotSize + s.slotGap) - s.slotGap + PADDING_RIGHT
+                
+                local y1 = -(minRow - 1) * (s.slotSize + s.slotGap) + PADDING_TOP
+                local y2 = -(maxRow * (s.slotSize + s.slotGap) - s.slotGap) - PADDING_BOTTOM
+
                 rowData.visual:ClearAllPoints()
-                rowData.visual:SetPoint("TOPLEFT", rowData.slots[min_i], "TOPLEFT", -PADDING_LEFT, PADDING_TOP)
-                rowData.visual:SetPoint("BOTTOMRIGHT", rowData.slots[max_i], "BOTTOMRIGHT", PADDING_RIGHT, -PADDING_BOTTOM)
+                rowData.visual:SetPoint("TOPLEFT", rowData.frame, "TOPLEFT", x1, y1)
+                rowData.visual:SetPoint("BOTTOMRIGHT", rowData.frame, "TOPLEFT", x2, y2)
                 rowData.visual:Show()
             else
-                rowData.visual:Hide() -- Скрываем фон, если активных кнопок нет вообще
+                rowData.visual:Hide()
             end
 
             -- Принудительно обновляем прозрачность с учетом текущего положения курсора

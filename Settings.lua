@@ -37,6 +37,7 @@ function ns.InitDB()
         dragShift = false,
         alphaButtonsHover = 100,
         rangeCheck = true,
+        rows = 1,
     }
     for k, v in pairs(defs) do
         if HealcraftDB.settings[k] == nil then
@@ -246,14 +247,15 @@ end)
 -- === Left slider column ===
 alignFrom = activeCb
 alignFrom = CreateSlider(generalScroll, "Slots count", 1, 5, 1, "slotsCount", slidersOffset, gapYSliders+addYGap)
+alignFrom = CreateSlider(generalScroll, "Slot size", 18, 75, 1, "slotSize", 0, gapYSliders)
 alignFrom = CreateSlider(generalScroll, "Offset X", -12, 30, 1, "offsetX", 0, gapYSliders)
 alignFrom = CreateSlider(generalScroll, "Transparency", 10, 100, 5, "alphaButtons", 0, gapYSliders)
-alignFrom = CreateSlider(generalScroll, "Slots gap", -4, 30, 1, "slotGap", 0, gapYSliders)
 local lastLeftItem = alignFrom;
 
 -- === Right slider column ===
 alignFrom = activeCb
-alignFrom = CreateSlider(generalScroll, "Slot size", 18, 75, 1, "slotSize", 200, gapYSliders+addYGap)
+alignFrom = CreateSlider(generalScroll, "Rows", 1, 2, 1, "rows", 200, gapYSliders+addYGap)
+alignFrom = CreateSlider(generalScroll, "Slots gap", -4, 30, 1, "slotGap", 0, gapYSliders)
 alignFrom = CreateSlider(generalScroll, "Offset Y", -20, 30, 1, "offsetY", 0, gapYSliders)
 alignFrom = CreateSlider(generalScroll, "Hover transparency", 10, 100, 5, "alphaButtonsHover", 0, gapYSliders)
 alignFrom = lastLeftItem
