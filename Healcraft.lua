@@ -221,10 +221,32 @@ local function ClearSlot(slot)
     end
     ns.UpdateSlotsVisibility()
 end
+
+-- -----------------------------------------------------------------------
+-- Проверка модификаторов для начала перетаскивания
+-- -----------------------------------------------------------------------
+local function IsDragAllowed()
+    local s = HealcraftDB and HealcraftDB.settings
+    if not s then return true end
+
+    -- Если настройка включена, но соответствующая клавиша НЕ зажата — блокируем drag
+    if s.dragCtrl and not IsControlKeyDown() then
+        return false
+    end
+    if s.dragAlt and not IsAltKeyDown() then
+        return false
+    end
+    if s.dragShift and not IsShiftKeyDown() then
+        return false
+    end
+
+    -- Во всех остальных случаях (или если галочки не стоят вообще) — разрешаем
+    return true
+end
+
 -- -----------------------------------------------------------------------
 -- Create one spell slot
 -- -----------------------------------------------------------------------
-
 local function CreateSpellSlot(parent, unitID, slotIndex)
     local s = HealcraftDB.settings
     local slot = CreateFrame("Button", nil, parent, "SecureActionButtonTemplate")
@@ -455,11 +477,14 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
         end
     end)
 
-    -- drag start (pick up spell from slot like action bar)
+-- drag start (pick up spell from slot like action bar)
     slot:SetScript("OnDragStart", function(self)
         if self.spellName and not InCombatLockdown() and not HealcraftDB.settings.lockSpells then
-            PickupSpell(self.spellName)
-            ClearSlot(self)
+            -- Проверяем, зажаты ли требуемые модификаторы перед тем, как «взять» заклинание
+            if IsDragAllowed() then
+                PickupSpell(self.spellName)
+                ClearSlot(self)
+            end
         end
     end)
 
