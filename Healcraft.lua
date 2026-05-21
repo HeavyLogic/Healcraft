@@ -626,23 +626,31 @@ function ns.RefreshLayout()
     if InCombatLockdown() then return end 
 
     local s = HealcraftDB.settings
-    local numRows = s.rows or 1 -- По умолчанию 1 ряд, если настройка не задана
+    local numRows = s.rows or 1 -- По умолчанию 1 ряд
 
     for unitID, rowData in pairs(rows) do
         local anchor = FRAMES[unitID]
         if anchor then
-            -- 1. Позиционируем базовый невидимый фрейм-контейнер
+            -- 1. Позиционируем базовый невидимый фрейм-контейнер (он центрирован по высоте)
             rowData.frame:ClearAllPoints()
             rowData.frame:SetPoint("LEFT", anchor, "RIGHT", tonumber(s.offsetX) or 0, tonumber(s.offsetY) or 0)
 
             -- Вычисляем распределение слотов по рядам
             local slotsRow1 = s.slotsCount
             if numRows == 2 then
-                -- Если количество нечетное, в первом ряду будет на 1 слот больше
                 slotsRow1 = math.ceil(s.slotsCount / 2)
             end
 
-            -- 2. Пересчитываем положение кнопок (относительно rowData.frame)
+            -- Вычисляем общую высоту сетки и сдвиг вверх для вертикального центрирования
+            local totalGridHeight
+            if numRows == 2 then
+                totalGridHeight = 2 * s.slotSize + s.slotGap
+            else
+                totalGridHeight = s.slotSize
+            end
+            local shiftY = totalGridHeight / 2 -- Сдвиг вверх на половину высоты блока
+
+            -- 2. Пересчитываем положение кнопок
             for i = 1, MAX_SUPPORTED_SLOTS do
                 local slot = rowData.slots[i]
                 if i <= s.slotsCount then
@@ -653,14 +661,15 @@ function ns.RefreshLayout()
                         if i <= slotsRow1 then
                             -- Первый ряд (Сверху)
                             if i == 1 then
-                                slot:SetPoint("TOPLEFT", rowData.frame, "TOPLEFT", 0, 0)
+                                -- Смещаем первый слот вверх на shiftY, чтобы отцентрировать всю группу
+                                slot:SetPoint("TOPLEFT", rowData.frame, "TOPLEFT", 0, shiftY)
                             else
                                 slot:SetPoint("LEFT", rowData.slots[i-1], "RIGHT", s.slotGap, 0)
                             end
                         else
                             -- Второй ряд (Снизу)
                             if i == slotsRow1 + 1 then
-                                -- Первая кнопка второго ряда встает точно под первой кнопкой верхнего ряда
+                                -- Вторая строка встает под первой кнопкой с отступом вниз
                                 slot:SetPoint("TOPLEFT", rowData.slots[1], "BOTTOMLEFT", 0, -s.slotGap)
                             else
                                 slot:SetPoint("LEFT", rowData.slots[i-1], "RIGHT", s.slotGap, 0)
@@ -669,7 +678,8 @@ function ns.RefreshLayout()
                     else
                         -- Обычный один ряд
                         if i == 1 then
-                            slot:SetPoint("TOPLEFT", rowData.frame, "TOPLEFT", 0, 0)
+                            -- Смещаем единственный ряд вверх на половину высоты кнопки
+                            slot:SetPoint("TOPLEFT", rowData.frame, "TOPLEFT", 0, shiftY)
                         else
                             slot:SetPoint("LEFT", rowData.slots[i-1], "RIGHT", s.slotGap, 0)
                         end
@@ -718,12 +728,12 @@ function ns.RefreshLayout()
 
             -- 4. Растягиваем визуальную обертку rowData.visual по вычисленной сетке
             if minCol and maxCol and minRow and maxRow then
-                -- Математический расчет координат левого верхнего и правого нижнего углов
+                -- Математический расчет координат с учетом вертикального сдвига shiftY
                 local x1 = (minCol - 1) * (s.slotSize + s.slotGap) - PADDING_LEFT
                 local x2 = maxCol * (s.slotSize + s.slotGap) - s.slotGap + PADDING_RIGHT
                 
-                local y1 = -(minRow - 1) * (s.slotSize + s.slotGap) + PADDING_TOP
-                local y2 = -(maxRow * (s.slotSize + s.slotGap) - s.slotGap) - PADDING_BOTTOM
+                local y1 = shiftY - (minRow - 1) * (s.slotSize + s.slotGap) + PADDING_TOP
+                local y2 = shiftY - (maxRow * (s.slotSize + s.slotGap) - s.slotGap) - PADDING_BOTTOM
 
                 rowData.visual:ClearAllPoints()
                 rowData.visual:SetPoint("TOPLEFT", rowData.frame, "TOPLEFT", x1, y1)
