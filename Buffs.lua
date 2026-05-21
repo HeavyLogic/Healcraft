@@ -196,7 +196,7 @@ function ns.UpdateBuffs(unitID)
             local slot = rowData.slots[i]
             slot:Hide()
             slot.expirationTime = 0
-            slot.isTimerActive = false -- Reset
+            slot.isTimerActive = false
         end
         previousBuffs[unitID] = {}
         return
@@ -206,12 +206,9 @@ function ns.UpdateBuffs(unitID)
     local currentBuffs = {}
     local displayIndex = 1
 
-    -- Loop up to 40 (max buffs in 3.3.5)
     for i = 1, 40 do
         local name, _, icon, stacks, _, duration, expirationTime, unitCaster = UnitBuff(unitID, i)
         if not name then break end
-
-        -- stacks = 9 --debug
 
         if activeSpells[name] and unitCaster == "player" then
             currentBuffs[name] = true
@@ -221,41 +218,49 @@ function ns.UpdateBuffs(unitID)
                 slot.icon:SetTexture(icon)
                 slot.buffIndex = i
                 
-                if stacks and stacks > 1 and settings.showStacks then
+                -- Сбрасываем секундный маркер, чтобы центральный таймер мгновенно перерисовал время
+                slot.lastSec = -1
+
+                -- Определяем, что именно мы должны показать на баффе
+                local showStacks = (stacks and stacks > 1 and settings.showStacks)
+                local showTimer  = (duration and duration > 0 and expirationTime and not showStacks and settings.showTimer)
+
+                -- Логика стаков
+                if showStacks then
                     slot.buffText:SetText("x"..stacks)
                     slot.hasStacks = true
                     SetBuffTextStyle(slot, "stacks")
+                    slot.isTimerActive = false
                 else
-                    slot.buffText:SetText("")
                     slot.hasStacks = false
+                    -- Очищаем текст только если мы НЕ собираемся показывать там таймер
+                    if not showTimer then
+                        slot.buffText:SetText("")
+                    end
                 end
 
+                -- Логика таймера
                 if duration and duration > 0 and expirationTime then
-                    if not slot.hasStacks and settings.showTimer then
-                        slot.isTimerActive = true -- Start timer via flag
-                    else
-                        slot.isTimerActive = false
-                    end
+                    slot.isTimerActive = showTimer
 
-                    -- Update cooldown only if expiration time changed
+                    -- Обновляем кулдаун только если изменилось время окончания
                     if slot.expirationTime ~= expirationTime then
                         local start = expirationTime - duration
                         CooldownFrame_SetTimer(slot.cd, start, duration, 1)
                         slot.expirationTime = expirationTime
-                        slot.lastSec = -1 
                     end
                     
-                    -- Reset red color on buff refresh
+                    -- Сбрасываем красный цвет на желтый, если бафф обновили (время увеличилось)
                     local remain = expirationTime - GetTime()
                     if remain > URGENT_TIME then
-                        if settings.showTimer and not slot.hasStacks then
+                        if showTimer then
                             SetBuffTextStyle(slot, "normal")
                         end
                     end
                 else
                     slot.cd:Hide()
                     slot.expirationTime = 0
-                    slot.isTimerActive = false -- Reset flag
+                    slot.isTimerActive = false
                     slot.buffText:SetText("")
                 end
 
@@ -284,7 +289,7 @@ function ns.UpdateBuffs(unitID)
         local slot = rowData.slots[i]
         slot:Hide()
         slot.expirationTime = 0
-        slot.isTimerActive = false -- Reset
+        slot.isTimerActive = false
         slot.buffText:SetText("")
     end
 end
