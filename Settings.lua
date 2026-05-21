@@ -138,12 +138,42 @@ local function CreateCheckbox(panel, text, dbKey, x, y, callback)
 
     return checkbox
 end
+
+local function CreateScrollablePanel(parent, titleText, scrollHeight)
+    -- 1. Создаем неподвижный заголовок на основной панели (вне скролла)
+    local title = parent:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    title:SetPoint("TOPLEFT", 16, -16)
+    title:SetText(titleText)
+
+    -- 2. Создаем ScrollFrame
+    local scrollFrame = CreateFrame("ScrollFrame", parent:GetName() .. "ScrollFrame", parent, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", 16, -50)
+    scrollFrame:SetPoint("BOTTOMRIGHT", -32, 16)
+
+    -- 3. Создаем ScrollChild
+    local scrollChild = CreateFrame("Frame", parent:GetName() .. "ScrollChild", scrollFrame)
+    -- Задаем фиксированную ширину (400px идеально подходит под стандартное окно настроек 3.3.5)
+    scrollChild:SetWidth(400) 
+    scrollChild:SetHeight(scrollHeight or 500) 
+    
+    scrollFrame:SetScrollChild(scrollChild)
+
+    -- Копируем имя родительской панели, чтобы работал метод RefreshVisuals(panel.name)
+    scrollChild.name = parent.name
+
+    -- Настраиваем полосу прокрутки
+    local scrollBar = _G[scrollFrame:GetName() .. "ScrollBar"]
+    scrollBar:ClearAllPoints()
+    scrollBar:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", 6, -16)
+    scrollBar:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", 6, 16)
+
+    return scrollChild
+end
 -- -----------------------------------------------------------------------
 -- General tab contents
 -- -----------------------------------------------------------------------
-alignFrom = generalPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-alignFrom:SetPoint("TOPLEFT", 16, -16)
-alignFrom:SetText("Healcraft: General")
+-- Создаем скролл-панель (высота контента 550px)
+local generalScroll = CreateScrollablePanel(generalPanel, "Healcraft: General", 550)
 
 local gapYTitles = -16;
 local gapYSliders = -32;
@@ -152,28 +182,33 @@ local slidersOffset = 9;
 local dropdownsOffset = 10;
 local addYGap = 7;
 
--- Master switch
-local activeCb = CreateCheckbox(generalPanel, "Enable addon (Master Switch)", "isActive", 0, gapYTitles, function(self)
+-- Невидимый фрейм-якорь в самом верху скролл-панели
+alignFrom = CreateFrame("Frame", nil, generalScroll)
+alignFrom:SetSize(1, 1)
+alignFrom:SetPoint("TOPLEFT", generalScroll, "TOPLEFT", 0, 0)
+
+-- Master switch (родитель — generalScroll)
+local activeCb = CreateCheckbox(generalScroll, "Enable addon (Master Switch)", "isActive", 0, gapYTitles, function(self)
     ns.SetActive(self:GetChecked() ~= nil)
 end)
 
 -- === Left slider column ===
 alignFrom = activeCb
-alignFrom = CreateSlider(generalPanel, "Slots count", 1, 5, 1, "slotsCount", slidersOffset, gapYSliders+addYGap)
-alignFrom = CreateSlider(generalPanel, "Offset X", -12, 30, 1, "offsetX", 0, gapYSliders)
-alignFrom = CreateSlider(generalPanel, "Slots gap", -4, 30, 1, "slotGap", 0, gapYSliders)
+alignFrom = CreateSlider(generalScroll, "Slots count", 1, 5, 1, "slotsCount", slidersOffset, gapYSliders+addYGap)
+alignFrom = CreateSlider(generalScroll, "Offset X", -12, 30, 1, "offsetX", 0, gapYSliders)
+alignFrom = CreateSlider(generalScroll, "Slots gap", -4, 30, 1, "slotGap", 0, gapYSliders)
 
 local lastLeftItem = alignFrom;
 
 -- === Right slider column ===
 alignFrom = activeCb
-alignFrom = CreateSlider(generalPanel, "Slot size", 18, 75, 1, "slotSize", 200, gapYSliders+addYGap)
-alignFrom = CreateSlider(generalPanel, "Offset Y", -20, 30, 1, "offsetY", 0, gapYSliders)
-alignFrom = CreateSlider(generalPanel, "Spells transparency", 10, 100, 5, "alphaButtons", 0, gapYSliders)
+alignFrom = CreateSlider(generalScroll, "Slot size", 18, 75, 1, "slotSize", 200, gapYSliders+addYGap)
+alignFrom = CreateSlider(generalScroll, "Offset Y", -20, 30, 1, "offsetY", 0, gapYSliders)
+alignFrom = CreateSlider(generalScroll, "Spells transparency", 10, 100, 5, "alphaButtons", 0, gapYSliders)
 
 -- === Below columns ===
--- Slot flash mode
-local flashDD = CreateFrame("Frame", addonName.."FlashDropdown", generalPanel, "UIDropDownMenuTemplate")
+-- Slot flash mode (родитель — generalScroll)
+local flashDD = CreateFrame("Frame", addonName.."FlashDropdown", generalScroll, "UIDropDownMenuTemplate")
 flashDD:SetPoint("TOPLEFT", lastLeftItem, "BOTTOMLEFT", 0-slidersOffset-dropdownsOffset, gapYSliders-addYGap)
 local flashLabel = flashDD:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 flashLabel:SetPoint("BOTTOMLEFT", flashDD, "TOPLEFT", 16, 3)
@@ -198,7 +233,7 @@ UIDropDownMenu_Initialize(flashDD, InitFlashDropdown)
 
 -- Lock spells
 alignFrom = flashDD
-alignFrom = CreateCheckbox(generalPanel, "Lock spells (instant cast, no drag&drop)", "lockSpells", dropdownsOffset, gapYCheckboxes-addYGap, function(self)
+alignFrom = CreateCheckbox(generalScroll, "Lock spells (instant cast, no drag&drop)", "lockSpells", dropdownsOffset, gapYCheckboxes-addYGap, function(self)
     if InCombatLockdown() then
         print("|cffff0000[Healcraft]|r Cannot change this setting during combat!")
         self:SetChecked(HealcraftDB.settings.lockSpells)
@@ -208,7 +243,9 @@ alignFrom = CreateCheckbox(generalPanel, "Lock spells (instant cast, no drag&dro
     if ns.UpdateCastingBehavior then ns.UpdateCastingBehavior() end
 end)
 
-alignFrom = CreateCheckbox(generalPanel, "Show tooltips on spells", "showTooltips", 0, gapYCheckboxes)
+alignFrom = CreateCheckbox(generalScroll, "Show tooltips on spells", "showTooltips", 0, gapYCheckboxes)
+
+
 
 -- TODO: Modifiers for drag & drop
 
