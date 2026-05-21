@@ -21,14 +21,6 @@ local rows = {}
 local MAX_SUPPORTED_SLOTS = ns.MAX_SUPPORTED_SLOTS
 
 -- -----------------------------------------------------------------------
--- Настройки внутренних отступов (Padding) фрейма-обёртки
--- -----------------------------------------------------------------------
-local PADDING_LEFT   = 8
-local PADDING_RIGHT  = 8
-local PADDING_TOP    = 8
-local PADDING_BOTTOM = 8
-
--- -----------------------------------------------------------------------
 -- Логика изменения прозрачности при наведении (Hover Alpha)
 -- -----------------------------------------------------------------------
 local function GetRowAlphas()
@@ -41,27 +33,19 @@ end
 
 local function UpdateHoverAlpha(row)
     if not row then return end
-    local isOver = false
     
+    -- Проверяем наведение СТРОГО на блок visual
+    local isOver = false
     if row.visual and row.visual:IsVisible() and row.visual:IsMouseOver() then
         isOver = true
-    else
-        for i = 1, MAX_SUPPORTED_SLOTS do
-            local slot = row.slots[i]
-            if slot and slot:IsVisible() and slot:IsMouseOver() then
-                isOver = true
-                break
-            end
-        end
     end
 
     local normalAlpha, hoverAlpha = GetRowAlphas()
     row.frame.targetAlpha = isOver and hoverAlpha or normalAlpha
 
-    -- Получаем значение ползунка (0..9) и делим на 10 для получения секунд (0.0..0.9)
     local s = HealcraftDB and HealcraftDB.settings
-    local sliderVal = s and s.alphaButtonsTransition or 0
-    local transitionVal = sliderVal / 10 
+    local transitionVal = s and s.alphaButtonsTransition or 0
+    transitionVal = transitionVal / 10 
 
     if transitionVal == 0 then
         row.frame:SetAlpha(row.frame.targetAlpha)
@@ -113,63 +97,67 @@ local function UpdateCooldowns()
 end
 
 -- -----------------------------------------------------------------------
--- Единый обслуживающий таймер (С двумя независимыми интервалами)
+-- Единый обслуживающий таймер (Очищенный и оптимизированный)
 -- -----------------------------------------------------------------------
-local TICK_INTERVAL = 0.15   -- Низкая частота (Дистанция, Сброс мыши)
-
--- 0.03 (примерно 33 кадра/сек)
--- 0.04 (25 кадров/сек)
--- 0.02 (50 кадров/сек)
-local TICK_INTERVAL_FAST = 0.03
+local TICK_INTERVAL      = 0.15   -- Низкая частота (Дистанция)
+local TICK_INTERVAL_FAST = 0.03   -- Высокая частота (Анимации и Ховер)
 
 local tickTimer = 0
 local fastTickTimer = 0
-local wasDraggingSpell = false
 
 local updateFrame = CreateFrame("Frame")
-local updateFrame = CreateFrame("Frame")
-updateFrame:Hide() -- По умолчанию таймер выключен при загрузке
+updateFrame:Hide()
 
 updateFrame:SetScript("OnUpdate", function(self, elapsed)
-    -- Нам больше не нужны никакие проверки в начале кадра!
-    -- Локальная переменная dbSettings гарантированно существует и работает мгновенно.
-    local s = dbSettings 
+    local s = dbSettings
 
     -- -------------------------------------------------------------------
-    -- ЧАСТЬ 1. Анимации и Курсор (Выполняются раз в TICK_INTERVAL_FAST)
+    -- ЧАСТЬ 1. Анимации, Курсор и Ховер (Выполняются раз в TICK_INTERVAL_FAST)
     -- -------------------------------------------------------------------
     fastTickTimer = fastTickTimer + elapsed
     if fastTickTimer >= TICK_INTERVAL_FAST then
         local dt = fastTickTimer 
         fastTickTimer = 0
 
-        -- Отслеживание изменения состояния курсора (взяли/бросили спелл)
+        -- 1. Отслеживание изменения состояния курсора (взяли/бросили спелл)
         local cursorType = GetCursorInfo()
         local isDraggingSpell = (cursorType == "spell")
         if InCombatLockdown() or (s and s.lockSpells) then
             isDraggingSpell = false
         end
 
-        -- Если состояние изменилось (например, взяли спелл из книги) — обновляем разметку
         if isDraggingSpell ~= wasDraggingSpell then
             wasDraggingSpell = isDraggingSpell
             ns.RefreshLayout()
         end
 
-        -- Получаем значение ползунка (0..9) и переводим в секунды (0..0.9)
-        local sliderVal = s.alphaButtonsTransition or 0
-        local transitionVal = sliderVal / 10
+        -- 2. Отслеживание наведения мыши СТРОГО на блок visual (33 FPS)
+        for _, row in pairs(rows) do
+            if row.frame:IsVisible() then
+                local isMouseActuallyOver = false
+                if row.visual and row.visual:IsVisible() and row.visual:IsMouseOver() then
+                    isMouseActuallyOver = true
+                end
 
+                local normalAlpha, hoverAlpha = GetRowAlphas()
+                local expectedTarget = isMouseActuallyOver and hoverAlpha or normalAlpha
+                
+                -- Если текущая цель прозрачности не совпадает с физическим положением мыши
+                if row.frame.targetAlpha ~= expectedTarget then
+                    UpdateHoverAlpha(row)
+                end
+            end
+        end
+
+        -- 3. Анимация плавного затухания панелей (Transition)
+        local transitionVal = s.alphaButtonsTransition or 0
+        transitionVal = transitionVal / 10
         for unitID, row in pairs(rows) do
             if row.frame:IsVisible() then
-                
-                -- Анимация плавного затухания панелей (Transition)
-                -- Работает только если ползунок выставлен больше 0
                 if transitionVal > 0 and row.frame.targetAlpha then
                     local current = row.frame:GetAlpha()
                     local target = row.frame.targetAlpha
                     if math.abs(current - target) > 0.01 then
-                        -- Динамически рассчитываем скорость на основе секунд на ползунке
                         local fadeSpeed = 1 / transitionVal
                         local step = fadeSpeed * dt
                         if current < target then
@@ -182,7 +170,7 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
                     end
                 end
 
-                -- Анимация вспышек кнопок при успешном касте
+                -- 4. Анимация вспышек кнопок при успешном касте
                 for i = 1, s.slotsCount do
                     local slot = row.slots[i]
                     if slot.isFlashing then
@@ -214,7 +202,6 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
                         end
                     end
                 end
-
             end
         end
     end
@@ -228,7 +215,6 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
         
         for unitID, row in pairs(rows) do
             if row.frame:IsVisible() then
-                
                 -- Проверка дистанции спеллов
                 if s.rangeCheck then
                     for i = 1, s.slotsCount do
@@ -243,28 +229,6 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
                         end
                     end
                 end
-
-                -- Защита от залипания мыши (синхронизация состояния)
-                local isMouseActuallyOver = false
-                if row.visual and row.visual:IsVisible() and row.visual:IsMouseOver() then
-                    isMouseActuallyOver = true
-                else
-                    for i = 1, MAX_SUPPORTED_SLOTS do
-                        local slot = row.slots[i]
-                        if slot and slot:IsVisible() and slot:IsMouseOver() then
-                            isMouseActuallyOver = true
-                            break
-                        end
-                    end
-                end
-
-                local normalAlpha, hoverAlpha = GetRowAlphas()
-                local expectedTarget = isMouseActuallyOver and hoverAlpha or normalAlpha
-                
-                if row.frame.targetAlpha ~= expectedTarget then
-                    UpdateHoverAlpha(row)
-                end
-
             end
         end
     end
@@ -456,16 +420,13 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     slot:RegisterForDrag("LeftButton")
 
     -- Хуки для отслеживания наведения мыши на кнопки
-    slot:HookScript("OnEnter", function(self)
-        if rows[self.unitID] then UpdateHoverAlpha(rows[self.unitID]) end
-
+    slot:SetScript("OnEnter", function(self)
         if not HealcraftDB.settings.showTooltips then return end
         
         if self.spellName then
             local texture = GetTextureByName(self.spellName)
             if texture then
                 GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                -- SetSpellByID not reliable; use spellbook scan for tooltip
                 local bookSlot = nil
                 for i = 1, 1024 do
                     local n = GetSpellName(i, BOOKTYPE_SPELL)
@@ -479,8 +440,7 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
             end
         end
     end)
-    slot:HookScript("OnLeave", function(self)
-        if rows[self.unitID] then UpdateHoverAlpha(rows[self.unitID]) end
+    slot:SetScript("OnLeave", function()
         GameTooltip:Hide()
     end)
 
@@ -588,6 +548,11 @@ end
 -- -----------------------------------------------------------------------
 -- Create row for one party member
 -- -----------------------------------------------------------------------
+-- Настройки внутренних отступов для visual
+local PADDING_LEFT   = 8
+local PADDING_RIGHT  = 8
+local PADDING_TOP    = 2
+local PADDING_BOTTOM = 2
 
 local function CreateRow(unitID, anchor)
     if rows[unitID] then return end
@@ -606,16 +571,8 @@ local function CreateRow(unitID, anchor)
     -- })
     -- visual:SetBackdropColor(1, 0, 0, 0.45)    -- Красный полупрозрачный фон для теста
     -- visual:SetBackdropBorderColor(1, 0, 0, 0.7) -- Граница
-    visual:SetFrameLevel(rowFrame:GetFrameLevel()) -- На уровень ниже кнопок (фон)
+    -- visual:SetFrameLevel(rowFrame:GetFrameLevel()) -- На уровень ниже кнопок (фон)
     visual:EnableMouse(true)
-
-    -- Обработка наведения мыши на сам фон обёртки
-    visual:SetScript("OnEnter", function()
-        UpdateHoverAlpha(rows[unitID])
-    end)
-    visual:SetScript("OnLeave", function()
-        UpdateHoverAlpha(rows[unitID])
-    end)
 
     -- 3. Создаем слоты (их родителем является rowFrame)
     local slots = {}
