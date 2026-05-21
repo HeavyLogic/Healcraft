@@ -68,14 +68,14 @@ local rangeTimer = 0
 
 local rangeFrame = CreateFrame("Frame")
 rangeFrame:SetScript("OnUpdate", function(self, elapsed)
-    if not ns.IsActive() then return end
+    local s = HealcraftDB.settings
+    if not ns.IsActive() or not s.rangeCheck then return end
 
     rangeTimer = rangeTimer + elapsed
 
     -- Once 0.2 sec has passed, do the check
     if rangeTimer >= RANGE_CHECK_INTERVAL then
         rangeTimer = 0
-        local s = HealcraftDB.settings
         
         -- Iterate only over existing rows
         for unitID, row in pairs(rows) do
@@ -584,6 +584,10 @@ function ns.RefreshLayout()
                     slot:Show()
                 else
                     slot:Hide()
+                end
+
+                if not ns.IsActive() or not s.rangeCheck then
+                    slot.outOfRange:Hide()
                 end
             end
         end

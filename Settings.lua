@@ -95,9 +95,11 @@ end)
 -- Templates
 -- -----------------------------------------------------------------------
 local function RefreshVisuals(panelName)
-    if panelName == "General" then
+    if panelName == addonName .. "Panel1" then
+        -- General
         if ns.RefreshLayout then ns.RefreshLayout() end
-    elseif panelName == "Buffs" then
+    elseif panelName == addonName .. "Panel2" then
+        -- Buffs
         if ns.RefreshAllBuffs then ns.RefreshAllBuffs() end
     end
 end
