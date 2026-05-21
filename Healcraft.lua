@@ -16,6 +16,47 @@ local FRAMES = {
 local rows = {}
 local MAX_SUPPORTED_SLOTS = 5
 
+-- -----------------------------------------------------------------------
+-- Настройки внутренних отступов (Padding) фрейма-обёртки
+-- -----------------------------------------------------------------------
+local PADDING_LEFT   = 8
+local PADDING_RIGHT  = 8
+local PADDING_TOP    = 8
+local PADDING_BOTTOM = 8
+
+-- -----------------------------------------------------------------------
+-- Логика изменения прозрачности при наведении (Hover Alpha)
+-- -----------------------------------------------------------------------
+local function GetRowAlphas()
+    local s = HealcraftDB and HealcraftDB.settings
+    -- Значения по умолчанию, если настройки еще не созданы в БД
+    local normal = (s and s.alphaButtons or 80) / 100
+    local hover  = (s and s.alphaButtonsHover or 100) / 100
+    return normal, hover
+end
+
+local function UpdateHoverAlpha(row)
+    if not row then return end
+    local isOver = false
+    
+    -- Проверяем, наведен ли курсор на обертку
+    if row.visual and row.visual:IsVisible() and row.visual:IsMouseOver() then
+        isOver = true
+    else
+        -- Дополнительно проверяем кнопки (защита от потери фокуса на стыках)
+        for i = 1, MAX_SUPPORTED_SLOTS do
+            local slot = row.slots[i]
+            if slot and slot:IsVisible() and slot:IsMouseOver() then
+                isOver = true
+                break
+            end
+        end
+    end
+
+    local normalAlpha, hoverAlpha = GetRowAlphas()
+    row.frame:SetAlpha(isOver and hoverAlpha or normalAlpha)
+end
+
 -- Function that switches the button click mode
 function ns.UpdateCastingBehavior()
     -- Check if DB is loaded. If not - default false (allowed to drag)
@@ -298,7 +339,10 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     slot:EnableMouse(true)
     slot:RegisterForDrag("LeftButton")
 
-    slot:SetScript("OnEnter", function(self)
+    -- Хуки для отслеживания наведения мыши на кнопки
+    slot:HookScript("OnEnter", function(self)
+        if rows[self.unitID] then UpdateHoverAlpha(rows[self.unitID]) end
+
         if not HealcraftDB.settings.showTooltips then return end
         
         if self.spellName then
@@ -319,7 +363,8 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
             end
         end
     end)
-    slot:SetScript("OnLeave", function()
+    slot:HookScript("OnLeave", function(self)
+        if rows[self.unitID] then UpdateHoverAlpha(rows[self.unitID]) end
         GameTooltip:Hide()
     end)
 
@@ -428,16 +473,41 @@ end
 local function CreateRow(unitID, anchor)
     if rows[unitID] then return end
 
-    local row = CreateFrame("Frame", ADDON_NAME .. "Row_" .. unitID, anchor) 
-    -- Dimensions will be set later in ns.RefreshLayout
+    -- 1. Невидимый логический фрейм-контейнер (не ловит мышь)
+    local rowFrame = CreateFrame("Frame", ADDON_NAME .. "Row_" .. unitID, anchor) 
+    rowFrame:SetSize(1, 1) -- Размер символический, все привязки пойдут к дочерним элементам
+
+    -- 2. Визуальный фрейм-обертка (фон аддона и сенсор наведения мыши)
+    local visual = CreateFrame("Frame", nil, rowFrame)
+    visual:SetBackdrop({
+        bgFile   = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        edgeSize = 8,
+        insets   = { left = 2, right = 2, top = 2, bottom = 2 },
+    })
+    visual:SetBackdropColor(1, 0, 0, 0.45)    -- Красный полупрозрачный фон для теста
+    visual:SetBackdropBorderColor(1, 0, 0, 0.7) -- Граница
+    visual:SetFrameLevel(rowFrame:GetFrameLevel()) -- На уровень ниже кнопок (фон)
+    visual:EnableMouse(true)
+
+    -- Обработка наведения мыши на сам фон обёртки
+    visual:SetScript("OnEnter", function()
+        UpdateHoverAlpha(rows[unitID])
+    end)
+    visual:SetScript("OnLeave", function()
+        UpdateHoverAlpha(rows[unitID])
+    end)
+
+    -- 3. Создаем слоты (их родителем является rowFrame)
     local slots = {}
     for i = 1, MAX_SUPPORTED_SLOTS do
-        local slot = CreateSpellSlot(row, unitID, i)
+        local slot = CreateSpellSlot(rowFrame, unitID, i)
+        slot:SetFrameLevel(rowFrame:GetFrameLevel() + 2) -- Кнопки ВСЕГДА поверх фона обертки
         slots[i] = slot
     end
 
-    row:Hide()
-    rows[unitID] = { frame = row, slots = slots }
+    rowFrame:Hide()
+    rows[unitID] = { frame = rowFrame, visual = visual, slots = slots }
 end
 
 -- -----------------------------------------------------------------------
@@ -560,17 +630,11 @@ function ns.RefreshLayout()
     for unitID, rowData in pairs(rows) do
         local anchor = FRAMES[unitID]
         if anchor then
-            local totalWidth = s.slotsCount * s.slotSize + (s.slotsCount - 1) * s.slotGap
-            rowData.frame:SetSize(totalWidth, s.slotSize)
-            
+            -- 1. Позиционируем базовый невидимый фрейм-контейнер
             rowData.frame:ClearAllPoints()
-            -- Attach LEFT of our frame to RIGHT of the anchor (PartyMemberFrame)
-            -- Use numbers directly.
             rowData.frame:SetPoint("LEFT", anchor, "RIGHT", tonumber(s.offsetX) or 0, tonumber(s.offsetY) or 0)
-            
-            rowData.frame:SetAlpha(s.alphaButtons / 100)
 
-            -- Update dimensions and position of the slots themselves
+            -- 2. Пересчитываем положение кнопок (они строятся относительно невидимого rowData.frame)
             for i = 1, MAX_SUPPORTED_SLOTS do
                 local slot = rowData.slots[i]
                 if i <= s.slotsCount then
@@ -590,6 +654,36 @@ function ns.RefreshLayout()
                     slot.outOfRange:Hide()
                 end
             end
+
+            -- 3. Вычисляем крайние активные (непустые) кнопки в ряду
+            local cursorType = GetCursorInfo()
+            local isDraggingSpell = (cursorType == "spell")
+            if InCombatLockdown() or s.lockSpells then
+                isDraggingSpell = false
+            end
+
+            local min_i, max_i = nil, nil
+            for i = 1, s.slotsCount do
+                local slot = rowData.slots[i]
+                -- Кнопка считается активной, если на ней есть спелл ИЛИ мы тащим спелл мышкой для настройки
+                if slot.spellName or isDraggingSpell then
+                    if not min_i then min_i = i end
+                    max_i = i
+                end
+            end
+
+            -- 4. Растягиваем визуальную обертку row.visual между крайними кнопками с учетом внутренних отступов (padding)
+            if min_i and max_i then
+                rowData.visual:ClearAllPoints()
+                rowData.visual:SetPoint("TOPLEFT", rowData.slots[min_i], "TOPLEFT", -PADDING_LEFT, PADDING_TOP)
+                rowData.visual:SetPoint("BOTTOMRIGHT", rowData.slots[max_i], "BOTTOMRIGHT", PADDING_RIGHT, -PADDING_BOTTOM)
+                rowData.visual:Show()
+            else
+                rowData.visual:Hide() -- Скрываем фон, если активных кнопок нет вообще
+            end
+
+            -- Принудительно обновляем прозрачность с учетом текущего положения курсора
+            UpdateHoverAlpha(rowData)
         end
     end
     ns.UpdateSlotsVisibility()
@@ -645,7 +739,9 @@ initFrame:SetScript("OnEvent", function(self, event, arg1)
         if ns.IsActive() then UpdateCooldowns() end
 
     elseif event == "CURSOR_UPDATE" then
-        if ns.IsActive() then ns.UpdateSlotsVisibility() end
+        -- Вызываем RefreshLayout при изменении состояния курсора,
+        -- чтобы фон обертки моментально реагировал на начало/конец перетаскивания заклинания.
+        if ns.IsActive() then ns.RefreshLayout() end
 
     elseif event == "UNIT_AURA" then
         -- Call the buff update function
