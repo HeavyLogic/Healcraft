@@ -14,6 +14,10 @@ local FRAMES = {
 }
 
 local rows = {}
+local MAX_SUPPORTED_SLOTS = 5
+local dbSettings = nil -- Локальный кэш для HealcraftDB.settings
+
+local rows = {}
 local MAX_SUPPORTED_SLOTS = ns.MAX_SUPPORTED_SLOTS
 
 -- -----------------------------------------------------------------------
@@ -123,10 +127,13 @@ local fastTickTimer = 0
 local wasDraggingSpell = false
 
 local updateFrame = CreateFrame("Frame")
-updateFrame:SetScript("OnUpdate", function(self, elapsed)
-    if not ns.IsActive() then return end
+local updateFrame = CreateFrame("Frame")
+updateFrame:Hide() -- По умолчанию таймер выключен при загрузке
 
-    local s = HealcraftDB.settings
+updateFrame:SetScript("OnUpdate", function(self, elapsed)
+    -- Нам больше не нужны никакие проверки в начале кадра!
+    -- Локальная переменная dbSettings гарантированно существует и работает мгновенно.
+    local s = dbSettings 
 
     -- -------------------------------------------------------------------
     -- ЧАСТЬ 1. Анимации и Курсор (Выполняются раз в TICK_INTERVAL_FAST)
@@ -647,14 +654,20 @@ local function RefreshRows()
     local groupSize = GetNumPartyMembers()
     local isActive = ns.IsActive() -- Check master switch
 
+    -- ОПТИМИЗАЦИЯ: Включаем таймер только если аддон активен И мы в группе.
+    -- Если мы соло или аддон отключен — OnUpdate засыпает и потребляет 0% CPU.
+    if isActive and groupSize > 0 then
+        updateFrame:Show()
+    else
+        updateFrame:Hide()
+    end
+
     for i = 1, 4 do
         local unitID = "party" .. i
         if rows[unitID] then
-            -- If addon is on AND player is in a group
             if isActive and i <= groupSize then
                 rows[unitID].frame:Show()
             else
-                -- Otherwise hide all slots
                 rows[unitID].frame:Hide()
             end
         end
@@ -877,6 +890,9 @@ initFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "PLAYER_LOGIN" then
         -- 1. First load the database and settings
         ns.InitDB()
+
+        -- Кэшируем настройки в локальную переменную
+        dbSettings = HealcraftDB.settings
 
         -- 2. Then create UI
         for _, unitID in ipairs(UNITS) do
