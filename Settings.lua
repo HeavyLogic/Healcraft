@@ -26,9 +26,9 @@ function ns.InitDB()
         offsetY    = 6,
         flashMode  = 3,
         lockSpells = false,
-        alphaButtons = 80,
+        alphaButtons = 60,
         alphaButtonsHover = 100,
-        alphaButtonsTransition = true,
+        alphaButtonsTransition = 1,
         buffsActive = true,
         showTimer   = true,
         alphaBuffs  = 80,
@@ -252,6 +252,7 @@ alignFrom = CreateSlider(generalScroll, "Slots count", 1, ns.MAX_SUPPORTED_SLOTS
 alignFrom = CreateSlider(generalScroll, "Slot size", 18, 75, 1, "slotSize", 0, gapYSliders)
 alignFrom = CreateSlider(generalScroll, "Offset X", -12, 30, 1, "offsetX", 0, gapYSliders)
 alignFrom = CreateSlider(generalScroll, "Transparency", 0, 100, 5, "alphaButtons", 0, gapYSliders)
+alignFrom = CreateSlider(generalScroll, "Transparency transition", 0, 5, 1, "alphaButtonsTransition", 0, gapYSliders)
 local lastLeftItem = alignFrom;
 
 -- === Right slider column ===
@@ -263,7 +264,6 @@ alignFrom = CreateSlider(generalScroll, "Hover transparency", 0, 100, 5, "alphaB
 alignFrom = lastLeftItem
 
 -- === Below columns ===
-alignFrom = CreateCheckbox(generalScroll, "Transparency soft transition", "alphaButtonsTransition", 0, 0)
 
 -- Slot flash mode
 local flashDD = CreateFrame("Frame", addonName.."FlashDropdown", generalScroll, "UIDropDownMenuTemplate")

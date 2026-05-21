@@ -35,28 +35,6 @@ local function GetRowAlphas()
     return normal, hover
 end
 
--- Скорость изменения альфы (значение 5 означает переход от 0 до 1 за 0.2 секунды)
-local FADE_SPEED = 5 
-
--- Обработчик плавного затухания
-local function RowFadeOnUpdate(self, elapsed)
-    local current = self:GetAlpha()
-    local target = self.targetAlpha or current
-
-    -- Если разница ничтожно мала, завершаем анимацию
-    if math.abs(current - target) < 0.01 then
-        self:SetAlpha(target)
-        self:SetScript("OnUpdate", nil) -- Полностью отключаем OnUpdate для экономии процессора
-    else
-        local step = FADE_SPEED * elapsed
-        if current < target then
-            self:SetAlpha(math.min(current + step, target))
-        else
-            self:SetAlpha(math.max(current - step, target))
-        end
-    end
-end
-
 local function UpdateHoverAlpha(row)
     if not row then return end
     local isOver = false
@@ -76,9 +54,12 @@ local function UpdateHoverAlpha(row)
     local normalAlpha, hoverAlpha = GetRowAlphas()
     row.frame.targetAlpha = isOver and hoverAlpha or normalAlpha
 
-    -- Если плавная анимация отключена, мгновенно применяем альфу
+    -- Получаем значение ползунка (0..9) и делим на 10 для получения секунд (0.0..0.9)
     local s = HealcraftDB and HealcraftDB.settings
-    if not (s and s.alphaButtonsTransition) then
+    local sliderVal = s and s.alphaButtonsTransition or 0
+    local transitionVal = sliderVal / 10 
+
+    if transitionVal == 0 then
         row.frame:SetAlpha(row.frame.targetAlpha)
     end
 end
@@ -128,11 +109,18 @@ local function UpdateCooldowns()
 end
 
 -- -----------------------------------------------------------------------
--- Единый центральный игровой цикл Healcraft
+-- Единый обслуживающий таймер (С двумя независимыми интервалами)
 -- -----------------------------------------------------------------------
-local TICK_INTERVAL = 0.15 
+local TICK_INTERVAL = 0.15   -- Низкая частота (Дистанция, Сброс мыши)
+
+-- 0.03 (примерно 33 кадра/сек)
+-- 0.04 (25 кадров/сек)
+-- 0.02 (50 кадров/сек)
+local TICK_INTERVAL_FAST = 0.03
+
 local tickTimer = 0
-local FADE_SPEED = 5 -- Скорость затухания панелей
+local fastTickTimer = 0
+local wasDraggingSpell = false
 
 local updateFrame = CreateFrame("Frame")
 updateFrame:SetScript("OnUpdate", function(self, elapsed)
@@ -141,67 +129,91 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
     local s = HealcraftDB.settings
 
     -- -------------------------------------------------------------------
-    -- ЧАСТЬ 1. Высокочастотные анимации (Выполняются каждый кадр)
+    -- ЧАСТЬ 1. Анимации и Курсор (Выполняются раз в TICK_INTERVAL_FAST)
     -- -------------------------------------------------------------------
-    for unitID, row in pairs(rows) do
-        if row.frame:IsVisible() then
-            
-            -- Анимация плавного затухания панелей (Transition)
-            if s.alphaButtonsTransition and row.frame.targetAlpha then
-                local current = row.frame:GetAlpha()
-                local target = row.frame.targetAlpha
-                if math.abs(current - target) > 0.01 then
-                    local step = FADE_SPEED * elapsed
-                    if current < target then
-                        row.frame:SetAlpha(math.min(current + step, target))
-                    else
-                        row.frame:SetAlpha(math.max(current - step, target))
+    fastTickTimer = fastTickTimer + elapsed
+    if fastTickTimer >= TICK_INTERVAL_FAST then
+        local dt = fastTickTimer 
+        fastTickTimer = 0
+
+        -- Отслеживание изменения состояния курсора (взяли/бросили спелл)
+        local cursorType = GetCursorInfo()
+        local isDraggingSpell = (cursorType == "spell")
+        if InCombatLockdown() or (s and s.lockSpells) then
+            isDraggingSpell = false
+        end
+
+        -- Если состояние изменилось (например, взяли спелл из книги) — обновляем разметку
+        if isDraggingSpell ~= wasDraggingSpell then
+            wasDraggingSpell = isDraggingSpell
+            ns.RefreshLayout()
+        end
+
+        -- Получаем значение ползунка (0..9) и переводим в секунды (0..0.9)
+        local sliderVal = s.alphaButtonsTransition or 0
+        local transitionVal = sliderVal / 10
+
+        for unitID, row in pairs(rows) do
+            if row.frame:IsVisible() then
+                
+                -- Анимация плавного затухания панелей (Transition)
+                -- Работает только если ползунок выставлен больше 0
+                if transitionVal > 0 and row.frame.targetAlpha then
+                    local current = row.frame:GetAlpha()
+                    local target = row.frame.targetAlpha
+                    if math.abs(current - target) > 0.01 then
+                        -- Динамически рассчитываем скорость на основе секунд на ползунке
+                        local fadeSpeed = 1 / transitionVal
+                        local step = fadeSpeed * dt
+                        if current < target then
+                            row.frame:SetAlpha(math.min(current + step, target))
+                        else
+                            row.frame:SetAlpha(math.max(current - step, target))
+                        end
+                    elseif current ~= target then
+                        row.frame:SetAlpha(target)
                     end
-                elseif current ~= target then
-                    row.frame:SetAlpha(target)
                 end
-            end
 
-            -- Анимация вспышек кнопок при успешном касте
-            for i = 1, s.slotsCount do
-                local slot = row.slots[i]
-                if slot.isFlashing then
-                    slot.flashElapsed = slot.flashElapsed + elapsed
-                    local progress = slot.flashElapsed / 0.6 -- Длительность анимации 0.6 сек
-                    local flashTex = slot.flashTexture
+                -- Анимация вспышек кнопок при успешном касте
+                for i = 1, s.slotsCount do
+                    local slot = row.slots[i]
+                    if slot.isFlashing then
+                        slot.flashElapsed = slot.flashElapsed + dt
+                        local progress = slot.flashElapsed / 0.6
+                        local flashTex = slot.flashTexture
 
-                    if progress >= 1 then
-                        slot.isFlashing = false
-                        flashTex:Hide()
-                    else
-                        if s.flashMode == 1 then
-                            flashTex:SetAlpha(1 - progress)
-                        elseif s.flashMode == 2 then
-                            flashTex:SetAlpha(1)
-                        elseif s.flashMode == 3 then
-                            -- 1. Плавное появление и затухание (синусоида)
-                            flashTex:SetAlpha(math.sin(progress * math.pi))
-                            
-                            -- 2. Вращение текстуры по часовой стрелке
-                            local angle = progress * (math.pi / 2)
-                            local cosA, sinA = math.cos(angle), math.sin(angle)
-                            
-                            local ULx, ULy = 0.5 - 0.5*cosA + 0.5*sinA, 0.5 - 0.5*sinA - 0.5*cosA
-                            local LLx, LLy = 0.5 - 0.5*cosA - 0.5*sinA, 0.5 - 0.5*sinA + 0.5*cosA
-                            local URx, URy = 0.5 + 0.5*cosA + 0.5*sinA, 0.5 + 0.5*sinA - 0.5*cosA
-                            local LRx, LRy = 0.5 + 0.5*cosA - 0.5*sinA, 0.5 + 0.5*sinA + 0.5*cosA
-                            
-                            flashTex:SetTexCoord(ULx, ULy, LLx, LLy, URx, URy, LRx, LRy)
+                        if progress >= 1 then
+                            slot.isFlashing = false
+                            flashTex:Hide()
+                        else
+                            if s.flashMode == 1 then
+                                flashTex:SetAlpha(1 - progress)
+                            elseif s.flashMode == 2 then
+                                flashTex:SetAlpha(1)
+                            elseif s.flashMode == 3 then
+                                flashTex:SetAlpha(math.sin(progress * math.pi))
+                                
+                                local angle = progress * (math.pi / 2)
+                                local cosA, sinA = math.cos(angle), math.sin(angle)
+                                
+                                local ULx, ULy = 0.5 - 0.5*cosA + 0.5*sinA, 0.5 - 0.5*sinA - 0.5*cosA
+                                local LLx, LLy = 0.5 - 0.5*cosA - 0.5*sinA, 0.5 - 0.5*sinA + 0.5*cosA
+                                local URx, URy = 0.5 + 0.5*cosA + 0.5*sinA, 0.5 + 0.5*sinA - 0.5*cosA
+                                local LRx, LRy = 0.5 + 0.5*cosA - 0.5*sinA, 0.5 + 0.5*sinA + 0.5*cosA
+                                
+                                flashTex:SetTexCoord(ULx, ULy, LLx, LLy, URx, URy, LRx, LRy)
+                            end
                         end
                     end
                 end
-            end
 
+            end
         end
     end
 
     -- -------------------------------------------------------------------
-    -- ЧАСТЬ 2. Низкочастотные проверки (Выполняются раз в 0.15 сек)
+    -- ЧАСТЬ 2. Проверки логики (Выполняются раз в TICK_INTERVAL)
     -- -------------------------------------------------------------------
     tickTimer = tickTimer + elapsed
     if tickTimer >= TICK_INTERVAL then
@@ -859,7 +871,7 @@ initFrame:RegisterEvent("PLAYER_LOGIN")
 initFrame:RegisterEvent("PARTY_MEMBERS_CHANGED")
 initFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 initFrame:RegisterEvent("UNIT_AURA")
-initFrame:RegisterEvent("CURSOR_UPDATE")
+-- initFrame:RegisterEvent("CURSOR_UPDATE")
 
 initFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "PLAYER_LOGIN" then
@@ -898,11 +910,6 @@ initFrame:SetScript("OnEvent", function(self, event, arg1)
 
     elseif event == "SPELL_UPDATE_COOLDOWN" then
         if ns.IsActive() then UpdateCooldowns() end
-
-    elseif event == "CURSOR_UPDATE" then
-        -- Вызываем RefreshLayout при изменении состояния курсора,
-        -- чтобы фон обертки моментально реагировал на начало/конец перетаскивания заклинания.
-        if ns.IsActive() then ns.RefreshLayout() end
 
     elseif event == "UNIT_AURA" then
         -- Call the buff update function
