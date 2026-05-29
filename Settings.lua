@@ -41,6 +41,9 @@ function ns.InitDB()
         rangeCheck = true,
         rows = 1,
         showCurses = true,
+        showPoisons = true,
+        showDiseases = true,
+        showMagic = true,
         alphaButtonsCombat = 100
     }
     for k, v in pairs(defs) do
@@ -254,7 +257,7 @@ alignFrom = CreateSlider(generalScroll, "Slots count", 1, ns.MAX_SUPPORTED_SLOTS
 alignFrom = CreateSlider(generalScroll, "Slot size", 18, 75, 1, "slotSize", 0, gapYSliders)
 alignFrom = CreateSlider(generalScroll, "Offset X", -12, 30, 1, "offsetX", 0, gapYSliders)
 alignFrom = CreateSlider(generalScroll, "Transparency", 0, 100, 5, "alphaButtons", 0, gapYSliders)
-alignFrom = CreateSlider(generalScroll, "Transparency transition", 0, 5, 1, "alphaButtonsTransition", 0, gapYSliders)
+alignFrom = CreateSlider(generalScroll, "Combat transparency", 0, 100, 5, "alphaButtonsCombat", 0, gapYSliders)
 local lastLeftItem = alignFrom;
 
 -- === Right slider column ===
@@ -263,7 +266,7 @@ alignFrom = CreateSlider(generalScroll, "Rows", 1, 2, 1, "rows", 200, gapYSlider
 alignFrom = CreateSlider(generalScroll, "Slots gap", -4, 30, 1, "slotGap", 0, gapYSliders)
 alignFrom = CreateSlider(generalScroll, "Offset Y", -20, 30, 1, "offsetY", 0, gapYSliders)
 alignFrom = CreateSlider(generalScroll, "Hover transparency", 0, 100, 5, "alphaButtonsHover", 0, gapYSliders)
-alignFrom = CreateSlider(generalScroll, "Combat transparency", 0, 100, 5, "alphaButtonsCombat", 0, gapYSliders)
+alignFrom = CreateSlider(generalScroll, "Transparency transition", 0, 5, 1, "alphaButtonsTransition", 0, gapYSliders)
 alignFrom = lastLeftItem
 
 -- === Below columns ===
@@ -326,6 +329,9 @@ alignFrom = CreateCheckbox(buffsScroll, "Show timer on buffs", "showTimer", 0, g
 alignFrom = CreateCheckbox(buffsScroll, "Show spell stacks", "showStacks", 0, gapYCheckboxes)
 alignFrom = CreateCheckbox(buffsScroll, "Show tooltips on buffs", "showTooltipsBuffs", 0, gapYCheckboxes)
 alignFrom = CreateCheckbox(buffsScroll, "Show curses", "showCurses", 0, gapYCheckboxes)
+alignFrom = CreateCheckbox(buffsScroll, "Show poisons", "showPoisons", 0, gapYCheckboxes)
+alignFrom = CreateCheckbox(buffsScroll, "Show diseases", "showDiseases", 0, gapYCheckboxes)
+alignFrom = CreateCheckbox(buffsScroll, "Show magic debuffs", "showMagic", 0, gapYCheckboxes)
 alignFrom = CreateSlider(buffsScroll, "Buffs transparency", 10, 100, 5, "alphaBuffs", slidersOffset, gapYSliders+addYGap)
 
 -- -----------------------------------------------------------------------

@@ -1,9 +1,10 @@
 local addonName, ns = ...
 
-local BUFF_SIZE = 16 -- at 19, built-in timer appears
+local BUFF_SIZE = 16 -- Size of the icon
 local BUFF_GAP  = 3
 local BUFF_OFFSET_Y = -1
-local URGENT_TIME = 5
+local DEBUFF_GAP_X = 8 -- Gap between the buff row and the debuff row
+local URGENT_TIME = 5 -- Time threshold for urgent countdown display (in seconds)
 local MAX_SUPPORTED_SLOTS = ns.MAX_SUPPORTED_SLOTS -- Reserve maximum slots
 
 local GetTime = GetTime
@@ -35,7 +36,15 @@ local TEXT_STYLES = {
     }
 }
 
-local buffRows = {}
+-- Sorting weights for debuffs (Magic is usually highest priority for healers)
+local DEBUFF_ORDER = {
+    ["Magic"]   = 1,
+    ["Curse"]   = 2,
+    ["Poison"]  = 3,
+    ["Disease"] = 4,
+}
+
+local auraRows = {}
 local previousBuffs = {}
 
 local function SetBuffTextStyle(slot, styleName)
@@ -59,20 +68,18 @@ local function SetBuffTextStyle(slot, styleName)
 end
 
 -- -----------------------------------------------------------------------
--- Centralized buff timer (called from the main file)
+-- Centralized aura timer (called from the main file)
 -- -----------------------------------------------------------------------
 function ns.UpdateAllBuffTimers()
     local now = GetTime()
     
-    for unitID, rowData in pairs(buffRows) do
-        -- Update timers only if the buff frame is currently visible on screen
-        if rowData.frame:IsVisible() then
+    for unitID, auraGroup in pairs(auraRows) do
+        -- Update Buffs
+        if auraGroup.buffs.frame:IsVisible() then
             for i = 1, MAX_SUPPORTED_SLOTS do
-                local slot = rowData.slots[i]
-                
+                local slot = auraGroup.buffs.slots[i]
                 if slot:IsVisible() and slot.isTimerActive and slot.expirationTime and slot.expirationTime > 0 then
                     local remain = slot.expirationTime - now
-                    
                     if remain <= 0 then
                         slot.expirationTime = 0
                         slot.isTimerActive = false
@@ -83,16 +90,45 @@ function ns.UpdateAllBuffTimers()
                         if currentSec ~= slot.lastSec then
                             slot.lastSec = currentSec
                             
-                            -- Change text style to red (urgent)
                             if remain <= URGENT_TIME then
-                                if slot.textStyle ~= "urgent" then
-                                    SetBuffTextStyle(slot, "urgent")
-                                end
+                                if slot.textStyle ~= "urgent" then SetBuffTextStyle(slot, "urgent") end
                             elseif slot.textStyle == "urgent" then
                                 SetBuffTextStyle(slot, "normal")
                             end
 
-                            -- Show countdown digits only if 20 seconds or less remain
+                            if remain <= 20 then
+                                slot.buffText:SetText(currentSec)
+                            else
+                                slot.buffText:SetText("")
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Update Debuffs
+        if auraGroup.debuffs.frame:IsVisible() then
+            for i = 1, MAX_SUPPORTED_SLOTS do
+                local slot = auraGroup.debuffs.slots[i]
+                if slot:IsVisible() and slot.isTimerActive and slot.expirationTime and slot.expirationTime > 0 then
+                    local remain = slot.expirationTime - now
+                    if remain <= 0 then
+                        slot.expirationTime = 0
+                        slot.isTimerActive = false
+                        slot.lastSec = -1
+                        slot.buffText:SetText("")
+                    else
+                        local currentSec = ceil(remain)
+                        if currentSec ~= slot.lastSec then
+                            slot.lastSec = currentSec
+                            
+                            if remain <= URGENT_TIME then
+                                if slot.textStyle ~= "urgent" then SetBuffTextStyle(slot, "urgent") end
+                            elseif slot.textStyle == "urgent" then
+                                SetBuffTextStyle(slot, "normal")
+                            end
+
                             if remain <= 20 then
                                 slot.buffText:SetText(currentSec)
                             else
@@ -106,14 +142,14 @@ function ns.UpdateAllBuffTimers()
     end
 end
 
-local function CreateBuffSlot(parent, unitID)
+local function CreateAuraSlot(parent, unitID, isDebuff)
     local slot = CreateFrame("Frame", nil, parent)
     slot:SetSize(BUFF_SIZE, BUFF_SIZE)
     slot.unitID = unitID
+    slot.isDebuff = isDebuff
 
     local icon = slot:CreateTexture(nil, "ARTWORK")
     icon:SetAllPoints()
-    -- Slightly trim edges to remove the default gray border of 3.3.5 icons
     icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
     slot.icon = icon
 
@@ -126,7 +162,7 @@ local function CreateBuffSlot(parent, unitID)
     -- Create a separate frame for texts to raise it above the cooldown shadow
     local textFrame = CreateFrame("Frame", nil, slot)
     textFrame:SetAllPoints()
-    textFrame:SetFrameLevel(cd:GetFrameLevel() + 2) -- Set higher frame level than cd
+    textFrame:SetFrameLevel(cd:GetFrameLevel() + 2)
 
     -- Text for timer and spell stacks
     local buffText = textFrame:CreateFontString(nil, "OVERLAY")
@@ -135,16 +171,20 @@ local function CreateBuffSlot(parent, unitID)
     SetBuffTextStyle(slot, "normal")
 
     slot.hasStacks = false
-    slot.isTimerActive = false -- Boolean flag instead of OnUpdate script
+    slot.isTimerActive = false
     slot.lastSec = -1 
 
     slot:EnableMouse(true)
     slot:SetScript("OnEnter", function(self)
         if not HealcraftDB.settings.showTooltipsBuffs then return end
         
-        if self.buffIndex then
+        if self.auraIndex then
             GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT", 15, -25)
-            GameTooltip:SetUnitBuff(self.unitID, self.buffIndex)
+            if self.isDebuff then
+                GameTooltip:SetUnitDebuff(self.unitID, self.auraIndex)
+            else
+                GameTooltip:SetUnitBuff(self.unitID, self.auraIndex)
+            end
         end
     end)
     slot:SetScript("OnLeave", function()
@@ -155,48 +195,75 @@ local function CreateBuffSlot(parent, unitID)
 end
 
 function ns.CreateBuffRow(unitID)
-    if buffRows[unitID] then return end
+    if auraRows[unitID] then return end
 
     local memberIndex = string.match(unitID, "%d+")
     local manaBar = _G["PartyMemberFrame" .. memberIndex .. "ManaBar"]
     if not manaBar then return end
 
-    -- Attach directly to the mana bar
-    local row = CreateFrame("Frame", addonName .. "BuffRow_" .. unitID, manaBar:GetParent())
-    row:SetSize((BUFF_SIZE + BUFF_GAP) * MAX_SUPPORTED_SLOTS, BUFF_SIZE)
-    row:SetPoint("TOPLEFT", manaBar, "BOTTOMLEFT", 0, BUFF_OFFSET_Y)
-    -- Raise level to avoid being overlapped by default frames
-    row:SetFrameLevel(manaBar:GetParent():GetFrameLevel() + 5)
+    local parentFrame = manaBar:GetParent()
 
-    local slots = {}
+    -- 1. Create Row for Beneficial Buffs (Player's spells)
+    local buffRow = CreateFrame("Frame", addonName .. "BuffRow_" .. unitID, parentFrame)
+    buffRow:SetSize((BUFF_SIZE + BUFF_GAP) * MAX_SUPPORTED_SLOTS, BUFF_SIZE)
+    buffRow:SetPoint("TOPLEFT", manaBar, "BOTTOMLEFT", 0, BUFF_OFFSET_Y)
+    buffRow:SetFrameLevel(parentFrame:GetFrameLevel() + 5)
+
+    local buffSlots = {}
     for i = 1, MAX_SUPPORTED_SLOTS do
-        local slot = CreateBuffSlot(row, unitID)
+        local slot = CreateAuraSlot(buffRow, unitID, false)
         if i == 1 then
-            slot:SetPoint("LEFT", row, "LEFT", 0, 0)
+            slot:SetPoint("LEFT", buffRow, "LEFT", 0, 0)
         else
-            slot:SetPoint("LEFT", slots[i-1], "RIGHT", BUFF_GAP, 0)
+            slot:SetPoint("LEFT", buffSlots[i-1], "RIGHT", BUFF_GAP, 0)
         end
         slot:Hide()
-        slots[i] = slot
+        buffSlots[i] = slot
     end
 
-    buffRows[unitID] = { frame = row, slots = slots }
+    -- 2. Create Row for Harmful Debuffs (Curses, Diseases, etc.) aligned horizontally to the right
+    local debuffRow = CreateFrame("Frame", addonName .. "DebuffRow_" .. unitID, parentFrame)
+    debuffRow:SetSize((BUFF_SIZE + BUFF_GAP) * MAX_SUPPORTED_SLOTS, BUFF_SIZE)
+    debuffRow:SetPoint("LEFT", buffRow, "RIGHT", DEBUFF_GAP_X, 0) -- Anchored to the right of the buff row
+    debuffRow:SetFrameLevel(parentFrame:GetFrameLevel() + 5)
+
+    local debuffSlots = {}
+    for i = 1, MAX_SUPPORTED_SLOTS do
+        local slot = CreateAuraSlot(debuffRow, unitID, true)
+        if i == 1 then
+            slot:SetPoint("LEFT", debuffRow, "LEFT", 0, 0)
+        else
+            slot:SetPoint("LEFT", debuffSlots[i-1], "RIGHT", BUFF_GAP, 0)
+        end
+        slot:Hide()
+        debuffSlots[i] = slot
+    end
+
+    auraRows[unitID] = {
+        buffs = { frame = buffRow, slots = buffSlots },
+        debuffs = { frame = debuffRow, slots = debuffSlots }
+    }
     previousBuffs[unitID] = {}
 end
 
 function ns.UpdateBuffs(unitID)
-    if not unitID or not buffRows[unitID] then return end
-    local rowData = buffRows[unitID]
+    if not unitID or not auraRows[unitID] then return end
+    local rowGroup = auraRows[unitID]
     local settings = HealcraftDB.settings
     
-    rowData.frame:SetAlpha(settings.alphaBuffs / 100)
+    rowGroup.buffs.frame:SetAlpha(settings.alphaBuffs / 100)
+    rowGroup.debuffs.frame:SetAlpha(settings.alphaBuffs / 100)
     
+    -- Hide all if addon or feature is disabled
     if not ns.IsActive() or not settings.buffsActive then
         for i = 1, MAX_SUPPORTED_SLOTS do
-            local slot = rowData.slots[i]
-            slot:Hide()
-            slot.expirationTime = 0
-            slot.isTimerActive = false
+            rowGroup.buffs.slots[i]:Hide()
+            rowGroup.buffs.slots[i].expirationTime = 0
+            rowGroup.buffs.slots[i].isTimerActive = false
+
+            rowGroup.debuffs.slots[i]:Hide()
+            rowGroup.debuffs.slots[i].expirationTime = 0
+            rowGroup.debuffs.slots[i].isTimerActive = false
         end
         previousBuffs[unitID] = {}
         return
@@ -204,74 +271,119 @@ function ns.UpdateBuffs(unitID)
 
     local activeSpells = ns.GetActiveSpells(unitID)
     local currentBuffs = {}
-    local displayIndex = 1
 
+    -- Temporary collections to store filtered auras
+    local tempBuffs = {}
+    local tempDebuffs = {}
+
+    -- Combined single loop to scan both Buffs and Debuffs simultaneously
     for i = 1, 40 do
-        local name, _, icon, stacks, _, duration, expirationTime, unitCaster = UnitBuff(unitID, i)
-        if not name then break end
+        local bName, _, bIcon, bStacks, _, bDuration, bExpirationTime, bUnitCaster = UnitBuff(unitID, i)
+        local dName, _, dIcon, dStacks, dDebuffType, dDuration, dExpirationTime, dUnitCaster = UnitDebuff(unitID, i)
 
-        if activeSpells[name] and unitCaster == "player" then
-            currentBuffs[name] = true
+        -- If both lists are fully exhausted, we can safely terminate the loop early (massive CPU saving)
+        if not bName and not dName then
+            break
+        end
 
-            local slot = rowData.slots[displayIndex]
-            if slot then
-                slot.icon:SetTexture(icon)
-                slot.buffIndex = i
-                
-                -- Reset second marker so the central timer instantly redraws the time
-                slot.lastSec = -1
+        -- Filter and collect Beneficial Buffs
+        if bName and activeSpells[bName] and bUnitCaster == "player" then
+            currentBuffs[bName] = true
+            table.insert(tempBuffs, {
+                name = bName,
+                icon = bIcon,
+                stacks = bStacks,
+                duration = bDuration,
+                expirationTime = bExpirationTime,
+                index = i
+            })
+        end
 
-                -- Determine what exactly to show on the buff
-                local showStacks = (stacks and stacks > 1 and settings.showStacks)
-                local showTimer  = (duration and duration > 0 and expirationTime and not showStacks and settings.showTimer)
-
-                -- Stacks logic
-                if showStacks then
-                    slot.buffText:SetText("x"..stacks)
-                    slot.hasStacks = true
-                    SetBuffTextStyle(slot, "stacks")
-                    slot.isTimerActive = false
-                else
-                    slot.hasStacks = false
-                    -- Clear text only if we are NOT going to show a timer there
-                    if not showTimer then
-                        slot.buffText:SetText("")
-                    end
-                end
-
-                -- Timer logic
-                if duration and duration > 0 and expirationTime then
-                    slot.isTimerActive = showTimer
-
-                    -- Update cooldown only if expiration time changed
-                    if slot.expirationTime ~= expirationTime then
-                        local start = expirationTime - duration
-                        CooldownFrame_SetTimer(slot.cd, start, duration, 1)
-                        slot.expirationTime = expirationTime
-                    end
-                    
-                    -- Reset red color to yellow if buff was refreshed (time increased)
-                    local remain = expirationTime - GetTime()
-                    if remain > URGENT_TIME then
-                        if showTimer then
-                            SetBuffTextStyle(slot, "normal")
-                        end
-                    end
-                else
-                    slot.cd:Hide()
-                    slot.expirationTime = 0
-                    slot.isTimerActive = false
-                    slot.buffText:SetText("")
-                end
-
-                slot:Show()
-                displayIndex = displayIndex + 1
+        -- Filter and collect Harmful Debuffs
+        if dName then
+            local isAllowed = false
+            if dDebuffType == "Curse" and settings.showCurses then
+                isAllowed = true
+            elseif dDebuffType == "Poison" and settings.showPoisons then
+                isAllowed = true
+            elseif dDebuffType == "Disease" and settings.showDiseases then
+                isAllowed = true
+            elseif dDebuffType == "Magic" and settings.showMagic then
+                isAllowed = true
             end
-            
-            if displayIndex > settings.slotsCount then break end
+
+            if isAllowed then
+                table.insert(tempDebuffs, {
+                    name = dName,
+                    icon = dIcon,
+                    stacks = dStacks,
+                    debuffType = dDebuffType,
+                    duration = dDuration,
+                    expirationTime = dExpirationTime,
+                    index = i
+                })
+            end
         end
     end
 
+    -- Sort debuffs by their type weight (Magic -> Curse -> Poison -> Disease)
+    table.sort(tempDebuffs, function(a, b)
+        local weightA = DEBUFF_ORDER[a.debuffType] or 5
+        local weightB = DEBUFF_ORDER[b.debuffType] or 5
+        return weightA < weightB
+    end)
+
+    -- -----------------------------------------------------------------------
+    -- Render Beneficial Buffs
+    -- -----------------------------------------------------------------------
+    local buffIndex = 1
+    for _, buffData in ipairs(tempBuffs) do
+        local slot = rowGroup.buffs.slots[buffIndex]
+        if slot then
+            slot.icon:SetTexture(buffData.icon)
+            slot.auraIndex = buffData.index
+            slot.lastSec = -1
+
+            local showStacks = (buffData.stacks and buffData.stacks > 1 and settings.showStacks)
+            local showTimer  = (buffData.duration and buffData.duration > 0 and buffData.expirationTime and not showStacks and settings.showTimer)
+
+            if showStacks then
+                slot.buffText:SetText("x"..buffData.stacks)
+                slot.hasStacks = true
+                SetBuffTextStyle(slot, "stacks")
+                slot.isTimerActive = false
+            else
+                slot.hasStacks = false
+                if not showTimer then slot.buffText:SetText("") end
+            end
+
+            if buffData.duration and buffData.duration > 0 and buffData.expirationTime then
+                slot.isTimerActive = showTimer
+                if slot.expirationTime ~= buffData.expirationTime then
+                    local start = buffData.expirationTime - buffData.duration
+                    CooldownFrame_SetTimer(slot.cd, start, buffData.duration, 1)
+                    slot.expirationTime = buffData.expirationTime
+                end
+                
+                local remain = buffData.expirationTime - GetTime()
+                if remain > URGENT_TIME and showTimer then
+                    SetBuffTextStyle(slot, "normal")
+                end
+            else
+                slot.cd:Hide()
+                slot.expirationTime = 0
+                slot.isTimerActive = false
+                slot.buffText:SetText("")
+            end
+
+            slot:Show()
+            buffIndex = buffIndex + 1
+        end
+
+        if buffIndex > settings.slotsCount then break end
+    end
+
+    -- Trigger button flashes on the main panel if player's buff faded
     if previousBuffs[unitID] then
         for oldSpellName, _ in pairs(previousBuffs[unitID]) do
             if not currentBuffs[oldSpellName] then
@@ -281,12 +393,70 @@ function ns.UpdateBuffs(unitID)
             end
         end
     end
-
     previousBuffs[unitID] = currentBuffs
 
-    -- Hide unused slots
-    for i = displayIndex, MAX_SUPPORTED_SLOTS do
-        local slot = rowData.slots[i]
+    -- Hide unused buff slots
+    for i = buffIndex, MAX_SUPPORTED_SLOTS do
+        local slot = rowGroup.buffs.slots[i]
+        slot:Hide()
+        slot.expirationTime = 0
+        slot.isTimerActive = false
+        slot.buffText:SetText("")
+    end
+
+    -- -----------------------------------------------------------------------
+    -- Render Harmful Debuffs
+    -- -----------------------------------------------------------------------
+    local debuffIndex = 1
+    for _, debuffData in ipairs(tempDebuffs) do
+        local slot = rowGroup.debuffs.slots[debuffIndex]
+        if slot then
+            slot.icon:SetTexture(debuffData.icon)
+            slot.auraIndex = debuffData.index
+            slot.lastSec = -1
+
+            local showStacks = (debuffData.stacks and debuffData.stacks > 1 and settings.showStacks)
+            local showTimer  = (debuffData.duration and debuffData.duration > 0 and debuffData.expirationTime and not showStacks and settings.showTimer)
+
+            if showStacks then
+                slot.buffText:SetText("x"..debuffData.stacks)
+                slot.hasStacks = true
+                SetBuffTextStyle(slot, "stacks")
+                slot.isTimerActive = false
+            else
+                slot.hasStacks = false
+                if not showTimer then slot.buffText:SetText("") end
+            end
+
+            if debuffData.duration and debuffData.duration > 0 and debuffData.expirationTime then
+                slot.isTimerActive = showTimer
+                if slot.expirationTime ~= debuffData.expirationTime then
+                    local start = debuffData.expirationTime - debuffData.duration
+                    CooldownFrame_SetTimer(slot.cd, start, debuffData.duration, 1)
+                    slot.expirationTime = debuffData.expirationTime
+                end
+                
+                local remain = debuffData.expirationTime - GetTime()
+                if remain > URGENT_TIME and showTimer then
+                    SetBuffTextStyle(slot, "normal")
+                end
+            else
+                slot.cd:Hide()
+                slot.expirationTime = 0
+                slot.isTimerActive = false
+                slot.buffText:SetText("")
+            end
+
+            slot:Show()
+            debuffIndex = debuffIndex + 1
+        end
+
+        if debuffIndex > settings.slotsCount then break end
+    end
+
+    -- Hide unused debuff slots
+    for i = debuffIndex, MAX_SUPPORTED_SLOTS do
+        local slot = rowGroup.debuffs.slots[i]
         slot:Hide()
         slot.expirationTime = 0
         slot.isTimerActive = false
@@ -295,7 +465,7 @@ function ns.UpdateBuffs(unitID)
 end
 
 function ns.RefreshAllBuffs()
-    for unitID in pairs(buffRows) do
+    for unitID in pairs(auraRows) do
         ns.UpdateBuffs(unitID)
     end
 end
