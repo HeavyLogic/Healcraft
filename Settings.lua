@@ -40,6 +40,8 @@ function ns.InitDB()
         dragShift = false,
         rangeCheck = true,
         rows = 1,
+        showCurses = true,
+        alphaButtonsCombat = 100
     }
     for k, v in pairs(defs) do
         if HealcraftDB.settings[k] == nil then
@@ -261,6 +263,7 @@ alignFrom = CreateSlider(generalScroll, "Rows", 1, 2, 1, "rows", 200, gapYSlider
 alignFrom = CreateSlider(generalScroll, "Slots gap", -4, 30, 1, "slotGap", 0, gapYSliders)
 alignFrom = CreateSlider(generalScroll, "Offset Y", -20, 30, 1, "offsetY", 0, gapYSliders)
 alignFrom = CreateSlider(generalScroll, "Hover transparency", 0, 100, 5, "alphaButtonsHover", 0, gapYSliders)
+alignFrom = CreateSlider(generalScroll, "Combat transparency", 0, 100, 5, "alphaButtonsCombat", 0, gapYSliders)
 alignFrom = lastLeftItem
 
 -- === Below columns ===
@@ -322,6 +325,7 @@ alignFrom = CreateCheckbox(buffsScroll, "Enable buffs", "buffsActive", 0, 0)
 alignFrom = CreateCheckbox(buffsScroll, "Show timer on buffs", "showTimer", 0, gapYCheckboxes)
 alignFrom = CreateCheckbox(buffsScroll, "Show spell stacks", "showStacks", 0, gapYCheckboxes)
 alignFrom = CreateCheckbox(buffsScroll, "Show tooltips on buffs", "showTooltipsBuffs", 0, gapYCheckboxes)
+alignFrom = CreateCheckbox(buffsScroll, "Show curses", "showCurses", 0, gapYCheckboxes)
 alignFrom = CreateSlider(buffsScroll, "Buffs transparency", 10, 100, 5, "alphaBuffs", slidersOffset, gapYSliders+addYGap)
 
 -- -----------------------------------------------------------------------

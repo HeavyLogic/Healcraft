@@ -21,7 +21,7 @@ local dbSettings = nil -- Local cache for HealcraftDB.settings
 -- Rank Downranking Helpers (WoW 3.3.5 specific)
 -- -----------------------------------------------------------------------
 
--- Разделяет строку вида "Быстрое исцеление(Ранг 2)" на базовое имя "Быстрое исцеление" и ранг "Ранг 2"
+-- Splits a string like "Flash Heal(Rank 2)" into base name "Flash Heal" and rank "Rank 2"
 local function ParseSpellNameAndRank(inputString)
     if not inputString then return nil, nil end
     local baseName, rank = string.match(inputString, "^([^%(]+)%(([^%)]+)%)$")
@@ -32,7 +32,7 @@ local function ParseSpellNameAndRank(inputString)
     end
 end
 
--- Сканирует книгу заклинаний и находит максимальный номер ранга для указанного заклинания
+-- Scans the spellbook and finds the maximum rank number for the specified spell
 local function GetMaxRankOfSpell(targetName)
     local maxRankNum = 0
     local maxRankStr = ""
@@ -52,7 +52,7 @@ local function GetMaxRankOfSpell(targetName)
     return maxRankNum, maxRankStr
 end
 
--- Находит индекс в книге заклинаний по сохраненному имени (с учетом ранга или без него)
+-- Finds the index in the spellbook by the saved name (with or without rank)
 local function FindSpellBookSlot(targetName)
     local baseName, targetRank = ParseSpellNameAndRank(targetName)
     local bookSlot = nil
@@ -61,10 +61,10 @@ local function FindSpellBookSlot(targetName)
         if not name then break end
         if name == baseName then
             if not targetRank then
-                -- Если ранг не указан, продолжаем искать до конца, чтобы вернуть максимальный
+                -- If no rank is specified, keep scanning to find the highest rank
                 bookSlot = i
             elseif rank == targetRank then
-                -- Если ищем конкретный ранг, возвращаем сразу при совпадении
+                -- If looking for a specific rank, return immediately on match
                 return i
             end
         end
@@ -79,6 +79,12 @@ local function GetRowAlphas()
     local s = HealcraftDB and HealcraftDB.settings
     -- Default values if settings are not yet created in DB
     local normal = (s and s.alphaButtons or 80) / 100
+
+    -- If in combat, override the normal base alpha with the combat alpha setting
+    if InCombatLockdown() then
+        normal = (s and s.alphaButtonsCombat or 80) / 100
+    end
+
     local hover  = (s and s.alphaButtonsHover or 100) / 100
     return normal, hover
 end
@@ -138,7 +144,7 @@ local function UpdateCooldowns()
             for i = 1, s.slotsCount do
                 local slot = row.slots[i]
                 if slot.spellName then
-                    -- Для КД используем базовое имя во избежание проблем совместимости API
+                    -- Use base name for cooldown queries to avoid API issues with rank strings
                     local baseName = ParseSpellNameAndRank(slot.spellName)
                     local start, duration, enable = GetSpellCooldown(baseName)
                     if start and duration then
@@ -252,8 +258,9 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
                                 
                                 local ULx, ULy = 0.5 - 0.5*cosA + 0.5*sinA, 0.5 - 0.5*sinA - 0.5*cosA
                                 local LLx, LLy = 0.5 - 0.5*cosA - 0.5*sinA, 0.5 - 0.5*sinA + 0.5*cosA
-                                local URx, URy = 0.5 + 0.5*cosA + 0.5*sinA, 0.5 + 0.5*sinA - 0.5*cosA
-                                local LRx, LRy = 0.5 + 0.5*cosA - 0.5*sinA, 0.5 + 0.5*sinA + 0.5*cosA
+                                
+                                URx, URy = 0.5 + 0.5*cosA + 0.5*sinA, 0.5 + 0.5*sinA - 0.5*cosA
+                                LRx, LRy = 0.5 + 0.5*cosA - 0.5*sinA, 0.5 + 0.5*sinA + 0.5*cosA
                                 
                                 flashTex:SetTexCoord(ULx, ULy, LLx, LLy, URx, URy, LRx, LRy)
                             end
@@ -504,9 +511,9 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     -- -----------------------------------------------------------------------
     
     local function HandleReceiveSpell(self, id, subType)
-        -- В 3.3.5 при перетаскивании заклинания из книги:
-        -- id - это индекс слота в книге заклинаний
-        -- subType - это тип книги ("spell")
+        -- In 3.3.5 when dragging a spell from the spellbook:
+        -- id is the slot index in the spellbook
+        -- subType is the book type ("spell")
         local name, rank = GetSpellName(id, subType)
         local _, _, texture = GetSpellInfo(id, subType)
     
@@ -514,13 +521,13 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
             -- Remember the old spell (if any)
             local oldName = self.spellName
     
-            -- Логика Downranking: проверяем, максимальный ли это ранг в книге
+            -- Downranking logic: check if this is the highest rank in the spellbook
             local dragRankNum = rank and tonumber(string.match(rank, "(%d+)")) or 0
             local maxRankNum, maxRankStr = GetMaxRankOfSpell(name)
 
             local spellToSave = name
             if dragRankNum > 0 and dragRankNum < maxRankNum then
-                -- Если перетащили более низкий ранг, сохраняем с указанием ранга в скобках
+                -- If a lower rank was dragged, save it with rank notation in parentheses
                 spellToSave = name .. "(" .. rank .. ")"
             end
 
@@ -735,7 +742,7 @@ function ns.GetActiveSpells(unitID)
         for i = 1, s.slotsCount do
             local spellName = rows[unitID].slots[i].spellName
             if spellName then
-                -- Возвращаем базовые имена без ранга, чтобы бафф-трекеры работали корректно
+                -- Return base names without rank so buff trackers function correctly
                 local baseName = ParseSpellNameAndRank(spellName)
                 activeSpells[baseName] = true
             end
