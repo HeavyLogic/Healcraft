@@ -14,11 +14,63 @@ local FRAMES = {
 }
 
 local rows = {}
-local MAX_SUPPORTED_SLOTS = 5
+local MAX_SUPPORTED_SLOTS = ns.MAX_SUPPORTED_SLOTS
 local dbSettings = nil -- Local cache for HealcraftDB.settings
 
-local rows = {}
-local MAX_SUPPORTED_SLOTS = ns.MAX_SUPPORTED_SLOTS
+-- -----------------------------------------------------------------------
+-- Rank Downranking Helpers (WoW 3.3.5 specific)
+-- -----------------------------------------------------------------------
+
+-- Разделяет строку вида "Быстрое исцеление(Ранг 2)" на базовое имя "Быстрое исцеление" и ранг "Ранг 2"
+local function ParseSpellNameAndRank(inputString)
+    if not inputString then return nil, nil end
+    local baseName, rank = string.match(inputString, "^([^%(]+)%(([^%)]+)%)$")
+    if baseName and rank then
+        return baseName, rank
+    else
+        return inputString, nil
+    end
+end
+
+-- Сканирует книгу заклинаний и находит максимальный номер ранга для указанного заклинания
+local function GetMaxRankOfSpell(targetName)
+    local maxRankNum = 0
+    local maxRankStr = ""
+    for i = 1, 1024 do
+        local name, rank = GetSpellName(i, BOOKTYPE_SPELL)
+        if not name then break end
+        if name == targetName then
+            if rank and rank ~= "" then
+                local rankNum = tonumber(string.match(rank, "(%d+)"))
+                if rankNum and rankNum > maxRankNum then
+                    maxRankNum = rankNum
+                    maxRankStr = rank
+                end
+            end
+        end
+    end
+    return maxRankNum, maxRankStr
+end
+
+-- Находит индекс в книге заклинаний по сохраненному имени (с учетом ранга или без него)
+local function FindSpellBookSlot(targetName)
+    local baseName, targetRank = ParseSpellNameAndRank(targetName)
+    local bookSlot = nil
+    for i = 1, 1024 do
+        local name, rank = GetSpellName(i, BOOKTYPE_SPELL)
+        if not name then break end
+        if name == baseName then
+            if not targetRank then
+                -- Если ранг не указан, продолжаем искать до конца, чтобы вернуть максимальный
+                bookSlot = i
+            elseif rank == targetRank then
+                -- Если ищем конкретный ранг, возвращаем сразу при совпадении
+                return i
+            end
+        end
+    end
+    return bookSlot
+end
 
 -- -----------------------------------------------------------------------
 -- Hover alpha transparency logic
@@ -86,7 +138,9 @@ local function UpdateCooldowns()
             for i = 1, s.slotsCount do
                 local slot = row.slots[i]
                 if slot.spellName then
-                    local start, duration, enable = GetSpellCooldown(slot.spellName)
+                    -- Для КД используем базовое имя во избежание проблем совместимости API
+                    local baseName = ParseSpellNameAndRank(slot.spellName)
+                    local start, duration, enable = GetSpellCooldown(baseName)
                     if start and duration then
                         CooldownFrame_SetTimer(slot.cd, start, duration, enable)
                     end
@@ -224,7 +278,8 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
                     for i = 1, s.slotsCount do
                         local slot = row.slots[i]
                         if slot.spellName then
-                            local inRange = IsSpellInRange(slot.spellName, slot.unitID)
+                            local baseName = ParseSpellNameAndRank(slot.spellName)
+                            local inRange = IsSpellInRange(baseName, slot.unitID)
                             if inRange == 0 then
                                 slot.outOfRange:Show()
                             else
@@ -267,10 +322,11 @@ end
 -- -----------------------------------------------------------------------
 
 local function GetTextureByName(targetName)
+    local baseName = ParseSpellNameAndRank(targetName)
     for i = 1, 1024 do
         local name = GetSpellName(i, BOOKTYPE_SPELL)
         if not name then break end
-        if name == targetName then
+        if name == baseName then
             local _, _, texture = GetSpellInfo(i, BOOKTYPE_SPELL)
             -- keep scanning — last match = highest rank, same texture family
             if texture then
@@ -431,12 +487,7 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
             local texture = GetTextureByName(self.spellName)
             if texture then
                 GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                local bookSlot = nil
-                for i = 1, 1024 do
-                    local n = GetSpellName(i, BOOKTYPE_SPELL)
-                    if not n then break end
-                    if n == self.spellName then bookSlot = i end
-                end
+                local bookSlot = FindSpellBookSlot(self.spellName)
                 if bookSlot then
                     GameTooltip:SetSpell(bookSlot, BOOKTYPE_SPELL)
                     GameTooltip:Show()
@@ -453,20 +504,37 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
     -- -----------------------------------------------------------------------
     
     local function HandleReceiveSpell(self, id, subType)
-        local name, _, texture = GetSpellInfo(id, subType)
+        -- В 3.3.5 при перетаскивании заклинания из книги:
+        -- id - это индекс слота в книге заклинаний
+        -- subType - это тип книги ("spell")
+        local name, rank = GetSpellName(id, subType)
+        local _, _, texture = GetSpellInfo(id, subType)
     
         if name and texture then
             -- Remember the old spell (if any)
             local oldName = self.spellName
     
+            -- Логика Downranking: проверяем, максимальный ли это ранг в книге
+            local dragRankNum = rank and tonumber(string.match(rank, "(%d+)")) or 0
+            local maxRankNum, maxRankStr = GetMaxRankOfSpell(name)
+
+            local spellToSave = name
+            if dragRankNum > 0 and dragRankNum < maxRankNum then
+                -- Если перетащили более низкий ранг, сохраняем с указанием ранга в скобках
+                spellToSave = name .. "(" .. rank .. ")"
+            end
+
             -- Fill the slot (FillSlot will update attributes to type="spell")
-            FillSlot(self, name, texture)
-            SaveSlot(self.unitID, self.slotIndex, name)
+            FillSlot(self, spellToSave, texture)
+            SaveSlot(self.unitID, self.slotIndex, spellToSave)
             ClearCursor() -- Clear cursor just in case
     
             -- If there was already a spell in the slot, pick it up on the cursor
             if oldName then
-                PickupSpell(oldName)
+                local oldSlot = FindSpellBookSlot(oldName)
+                if oldSlot then
+                    PickupSpell(oldSlot, BOOKTYPE_SPELL)
+                end
             end
             return true
         else
@@ -540,8 +608,11 @@ local function CreateSpellSlot(parent, unitID, slotIndex)
         if self.spellName and not InCombatLockdown() and not HealcraftDB.settings.lockSpells then
             -- Check if required modifiers are held before "picking up" the spell
             if IsDragAllowed() then
-                PickupSpell(self.spellName)
-                ClearSlot(self)
+                local bookSlot = FindSpellBookSlot(self.spellName)
+                if bookSlot then
+                    PickupSpell(bookSlot, BOOKTYPE_SPELL)
+                    ClearSlot(self)
+                end
             end
         end
     end)
@@ -567,15 +638,6 @@ local function CreateRow(unitID, anchor)
 
     -- Visual wrapper frame (addon background and mouse hover sensor)
     local visual = CreateFrame("Frame", nil, rowFrame)
-    -- visual:SetBackdrop({
-    --     bgFile   = "Interface\\Buttons\\WHITE8x8",
-    --     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-    --     edgeSize = 8,
-    --     insets   = { left = 2, right = 2, top = 2, bottom = 2 },
-    -- })
-    -- visual:SetBackdropColor(1, 0, 0, 0.45)    -- Red semi-transparent background for testing
-    -- visual:SetBackdropBorderColor(1, 0, 0, 0.7) -- Border
-    -- visual:SetFrameLevel(rowFrame:GetFrameLevel()) -- One level below buttons (background)
     visual:EnableMouse(true)
 
     -- Create slots (their parent is rowFrame)
@@ -652,11 +714,15 @@ end
 function ns.FlashSpellSlot(unitID, spellName)
     if rows[unitID] then
         local s = HealcraftDB.settings
+        local triggerBase = ParseSpellNameAndRank(spellName)
         for i = 1, s.slotsCount do
             local slot = rows[unitID].slots[i]
-            if slot.spellName == spellName then
-                slot.PlayFlash()
-                break
+            if slot.spellName then
+                local slotBase = ParseSpellNameAndRank(slot.spellName)
+                if slotBase == triggerBase then
+                    slot.PlayFlash()
+                    break
+                end
             end
         end
     end
@@ -669,7 +735,9 @@ function ns.GetActiveSpells(unitID)
         for i = 1, s.slotsCount do
             local spellName = rows[unitID].slots[i].spellName
             if spellName then
-                activeSpells[spellName] = true
+                -- Возвращаем базовые имена без ранга, чтобы бафф-трекеры работали корректно
+                local baseName = ParseSpellNameAndRank(spellName)
+                activeSpells[baseName] = true
             end
         end
     end
@@ -845,7 +913,6 @@ initFrame:RegisterEvent("PLAYER_LOGIN")
 initFrame:RegisterEvent("PARTY_MEMBERS_CHANGED")
 initFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 initFrame:RegisterEvent("UNIT_AURA")
--- initFrame:RegisterEvent("CURSOR_UPDATE")
 
 initFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "PLAYER_LOGIN" then
